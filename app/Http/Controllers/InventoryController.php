@@ -57,6 +57,7 @@ class InventoryController extends Controller
                 // Inventory field search
                 $baseQuery->where(function ($q) use ($search) {
                     $q->where('property_number', 'like', "%{$search}%")
+                      ->orWhere('ip_address', 'like', "%{$search}%")
                       ->orWhere('serial_number', 'like', "%{$search}%");
                 });
             }

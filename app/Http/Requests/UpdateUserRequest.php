@@ -23,21 +23,22 @@ class UpdateUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-          'username' => ['required', 'string', 'max:255'],
-          'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $this->user->id],
-          // 'password' => ['required', 'string', 'min:8', 'max:255'],
-          'photo_id' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
-          'role' => ['required', 'integer', 'exists:roles,id'],
-          'display_name' => ['required', 'string', 'max:255'],
-          'name' => ['required', 'string', 'max:255'],
-          'gender' => ['required', 'string', 'max:255'],
-          'designation' => ['required', 'string', 'max:255'],
+            'username' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $this->user->id],
+            'photo_id' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
+            'role' => ['required', 'integer', 'exists:roles,id'],
+            'display_name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
+            'gender' => ['required', 'string', 'max:255'],
+            'designation' => ['required', 'string', 'max:255'],
 
-          'offices_assigned_ids' => ['nullable', 'array'],
-          'offices_assigned_ids.*' => ['integer', 'exists:departments,id'],
-          
-          'agencies_assigned_ids' => ['nullable', 'array'],
-          'agencies_assigned_ids.*' => ['integer', 'exists:agencies,id'],
+            'offices_assigned_ids' => ['nullable', 'array'],
+            'offices_assigned_ids.*' => ['required'],
+
+            'offices_assigned' => ['nullable', 'string'],
+
+            'agencies_assigned_ids' => ['nullable', 'array'],
+            'agencies_assigned_ids.*' => ['integer', 'exists:agencies,id'],
         ];
     }
 }

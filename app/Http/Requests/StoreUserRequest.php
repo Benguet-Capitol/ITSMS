@@ -34,8 +34,10 @@ class StoreUserRequest extends FormRequest
             'designation' => ['required', 'string', 'max:255'],
 
             'offices_assigned_ids' => ['nullable', 'array'],
-            'offices_assigned_ids.*' => ['integer', 'exists:departments,id'],
-            
+            'offices_assigned_ids.*' => ['required'],
+
+            'offices_assigned' => ['nullable', 'string'],
+
             'agencies_assigned_ids' => ['nullable', 'array'],
             'agencies_assigned_ids.*' => ['integer', 'exists:agencies,id'],
         ];

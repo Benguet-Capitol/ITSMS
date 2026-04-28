@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use App\Http\Requests\StoreUserRequest;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\ProfileOffice;
 
 class UserController extends Controller
 {
@@ -58,92 +59,87 @@ class UserController extends Controller
     }
 
     public function store(StoreUserRequest $request) {
-      Gate::authorize('user_store');
-      
-      $data = $request->validated();
-      $data['img_path'] = null;
-      
-      if($request->hasFile('photo_id')) {
-        $path = $request->file('photo_id')->store('images/users/personnel', 'public');
-        $data['img_path'] = $path;
-      }
-      
-      $user = User::create([
-        'username' => $data['username'],
-        'email' => $data['email'],
-        'password' => Hash::make($data['password']),
-      ]);
-      
-      if($user){
-        $user->roles()->syncWithoutDetaching([$data['role']]);
-        Profile::create([
-          'user_id' => $user->id,
-          'display_name' => $data['display_name'],
-          'name' => $data['name'],
-          'gender' => $data['gender'],
-          'designation' => $data['designation'],
-          'engagement' => 'ready',
-          'img_path' => $data['img_path'],
+        Gate::authorize('user_store');
+
+        $data = $request->validated();
+        $data['img_path'] = null;
+
+        if ($request->hasFile('photo_id')) {
+            $path = $request->file('photo_id')->store('images/users/personnel', 'public');
+            $data['img_path'] = $path;
+        }
+
+        $user = User::create([
+            'username' => $data['username'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
         ]);
-          if (!empty($data['offices_assigned_ids'])) {
-              $user->profile->departments()->sync($data['offices_assigned_ids']);
-          }
-          
-          if (!empty($data['agencies_assigned_ids'])) {
-              $user->profile->agencies()->sync($data['agencies_assigned_ids']);
-          }
-      }
-      
-      return new UserResource($user);
+
+        if ($user) {
+            $user->roles()->syncWithoutDetaching([$data['role']]);
+
+            $profile = Profile::create([
+                'user_id' => $user->id,
+                'display_name' => $data['display_name'],
+                'name' => $data['name'],
+                'gender' => $data['gender'],
+                'designation' => $data['designation'],
+                'engagement' => 'ready',
+                'img_path' => $data['img_path'],
+            ]);
+
+            $this->syncProfileOffices($profile, $data['offices_assigned'] ?? null);
+            $profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
+        }
+
+        return new UserResource($user);
     }
 
     public function update(UpdateUserRequest $request, User $user) {
-      // Gate::authorize('user_update');
+        $data = $request->validated();
 
-      $data = $request->validated();
+        $user_data = [];
+        $profile_data = [];
+        $changedData = [];
 
-      $user_data = [];
-      $profile_data = [];
-      $changedData = [];
-      foreach ($data as $key => $value) {
-        if ($user->$key !== $value) {
-          $changedData[$key] = $value;
-          if($key === 'email' || $key === 'username' || $key === 'role') {
-            $user_data[$key] = $value;
-          } else if($key === 'display_name' || $key === 'name' || $key === 'gender' || $key === 'designation') {
-            $profile_data[$key] = $value;
-          }
-        }
-      }
+        foreach ($data as $key => $value) {
+            if ($user->$key !== $value) {
+                $changedData[$key] = $value;
 
-      if (!empty($changedData)) {
-        if($request->hasFile('photo_id')) {
-          $storage_public = Storage::disk('public');
-          if ($user->profile->img_path && $storage_public->exists($user->profile->img_path)) {
-            $storage_public->delete($user->profile->img_path);
-          }
-
-          $path = $request->file('photo_id')->store('images/users/personnel', 'public');
-          $profile_data['img_path'] = $path;
+                if ($key === 'email' || $key === 'username' || $key === 'role') {
+                    $user_data[$key] = $value;
+                } else if ($key === 'display_name' || $key === 'name' || $key === 'gender' || $key === 'designation') {
+                    $profile_data[$key] = $value;
+                }
+            }
         }
 
-        $user->update($user_data);
-      
-        if($user){
-          $user->roles()->sync([$data['role']]);
+        if (!empty($changedData)) {
+            if ($request->hasFile('photo_id')) {
+                $storage_public = Storage::disk('public');
 
-          Profile::where('user_id', $user->id)->update($profile_data);
-          if (!empty($data['offices_assigned_ids'])) {
-              $user->profile->departments()->sync($data['offices_assigned_ids']);
-          }
-          
-          if (!empty($data['agencies_assigned_ids'])) {
-              $user->profile->agencies()->sync($data['agencies_assigned_ids']);
-          }
+                if ($user->profile->img_path && $storage_public->exists($user->profile->img_path)) {
+                    $storage_public->delete($user->profile->img_path);
+                }
+
+                $path = $request->file('photo_id')->store('images/users/personnel', 'public');
+                $profile_data['img_path'] = $path;
+            }
+
+            $user->update($user_data);
+
+            if ($user) {
+                $user->roles()->sync([$data['role']]);
+
+                Profile::where('user_id', $user->id)->update($profile_data);
+
+                $user->refresh();
+                $this->syncProfileOffices($user->profile, $data['offices_assigned'] ?? null);
+                $user->profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
+            }
         }
-      }
 
-      return new UserResource($user);
+        return new UserResource($user->fresh());
     }
 
     public function destroy(User $user) {
@@ -168,5 +164,39 @@ class UserController extends Controller
         $user->roles()->syncWithoutDetaching([$role->id]);
 
         return response()->json(['message' => 'Role assigned to user successfully']);
+    }
+
+    private function syncProfileOffices(Profile $profile, ?string $officesAssignedJson = null): void {
+        $profile->profileOffices()->delete();
+
+        if (blank($officesAssignedJson)) {
+            return;
+        }
+
+        $offices = json_decode($officesAssignedJson, true);
+
+        if (!is_array($offices) || empty($offices)) {
+            return;
+        }
+
+        $rows = collect($offices)
+            ->filter(fn ($office) => !empty($office['id']))
+            ->unique('id')
+            ->map(function ($office) use ($profile) {
+                return [
+                    'profile_id' => $profile->id,
+                    'office_id' => (string) $office['id'],
+                    'office_code' => $office['office_code'] ?? $office['abbreviation'] ?? null,
+                    'office_desc' => $office['office_desc'] ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            })
+            ->values()
+            ->all();
+
+        if (!empty($rows)) {
+            ProfileOffice::insert($rows);
+        }
     }
 }

@@ -36,21 +36,16 @@ class Profile extends Model
           ->exists();
     }
 
-    public function user() {
-      return $this->belongsTo(User::class);
+     public function user() {
+        return $this->belongsTo(User::class);
     }
 
-    // public function tickets() {
-    //   return $this->belongsToMany(Ticket::class);
-    // }
-
     public function ticketPersonnel() {
-      // return $this->belongsToMany(Ticket::class, 'ticket_personnel');
-      return $this->belongsToMany(Ticket::class, 'ticket_personnel', 'profile_id', 'ticket_id');
+        return $this->belongsToMany(Ticket::class, 'ticket_personnel', 'profile_id', 'ticket_id');
     }
 
     public function solutions() {
-      return $this->hasMany(Solution::class, 'author_id');
+        return $this->hasMany(Solution::class, 'author_id');
     }
 
     public function departments() {
@@ -59,6 +54,25 @@ class Profile extends Model
 
     public function agencies() {
         return $this->belongsToMany(Agency::class, 'profile_agency');
+    }
+
+    public function profileOffices() {
+        return $this->hasMany(ProfileOffice::class);
+    }
+
+    public function getOfficeIdsAttribute(): array {
+        return $this->profileOffices->pluck('office_id')->toArray();
+    }
+
+    public function getOfficesAssignedAttribute(): array {
+        return $this->profileOffices->map(function ($office) {
+            return [
+                'id' => $office->office_id,
+                'office_code' => $office->office_code,
+                'office_desc' => $office->office_desc,
+                'abbreviation' => $office->office_code,
+            ];
+        })->toArray();
     }
 
 }

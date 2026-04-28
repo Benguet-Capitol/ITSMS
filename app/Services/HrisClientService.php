@@ -95,6 +95,13 @@ class HrisClientService
             ->all();
     }
 
+    ##
+    ## Offices
+    ##
+
+    /**
+     * Get offices from HRIS.
+     */
     public function getOffices(): array {
         $baseUrl = rtrim(config('services.hris.base_url'), '/');
 
@@ -103,4 +110,35 @@ class HrisClientService
 
         return $resp->json() ?? [];
     }
+
+    public function getOfficesCached(int $minutes = 30): array {
+        return Cache::remember('hris:offices:all', now()->addMinutes($minutes), function () {
+            return $this->getOffices();
+        });
+    }
+
+    public function searchOffices(string $q, int $limit = 50): array {
+        $q = trim($q);
+
+        if ($q === '') {
+            return [];
+        }
+
+        $needle = mb_strtolower($q);
+
+        return collect($this->getOfficesCached(30))
+            ->filter(function ($office) use ($needle) {
+                $haystack = mb_strtolower(implode(' ', array_filter([
+                    $office['office_code'] ?? '',
+                    $office['office_desc'] ?? '',
+                ])));
+
+                return str_contains($haystack, $needle);
+            })
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    
 }

@@ -23,6 +23,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\CommonProblemController;
 use App\Http\Controllers\MeasurementUnitController;
+use App\Http\Controllers\OfficeController;
 use App\Services\HrisClientService;
 
 Route::middleware('auth:sanctum')->get('/hris/debug/employees', function (HrisClientService $hris) {
@@ -32,6 +33,16 @@ Route::middleware('auth:sanctum')->get('/hris/debug/employees', function (HrisCl
         'count' => count($data),
         'keys' => array_keys($data[0] ?? []),
         'sample' => $data[0] ?? null,
+    ]);
+});
+
+// routes/api.php — temporary, remove after
+Route::get('/hris/debug/offices', function (HrisClientService $hris) {
+    $data = $hris->getOffices();
+    return response()->json([
+        'count'  => count($data),
+        'keys'   => array_keys($data[0] ?? []),
+        'sample' => array_slice($data, 0, 2),
     ]);
 });
 
@@ -73,6 +84,9 @@ Route::group(['middleware' => ['auth:sanctum', AuthGates::class]], function () {
   Route::apiResource('measurement-units', MeasurementUnitController::class);
 
   Route::apiResource('it-supplies', ItSupplyController::class);
+
+  Route::get('offices', [OfficeController::class, 'index']);
+  Route::get('offices-search', [OfficeController::class, 'search']);
 
   // Custom Routes
 
@@ -138,5 +152,4 @@ Route::group(['middleware' => ['auth:sanctum', AuthGates::class]], function () {
           'label' => str_replace('_', ' ', ucfirst($status->name)),
       ])
   );
-
 });
