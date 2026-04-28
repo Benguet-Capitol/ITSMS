@@ -1,0 +1,1 @@
+import{_ as t,c as o,d as n,o as s}from"./BpohRUro.js";const r={};function c(a,e){return s(),o("div",null,e[0]||(e[0]=[n("h1",null,"Pages Index",-1),n("p",null,"Lorem ipsum dolor sit amet consectetur adipisicing elit.",-1)]))}const l=t(r,[["render",c]]);export{l as default};
