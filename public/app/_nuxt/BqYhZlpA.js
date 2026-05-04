@@ -1,0 +1,1 @@
+import{aQ as s,E as r,av as a}from"./KQa6l-1e.js";const u=s(e=>{if(!e.meta.permission)return;if(!r().value?.permissions?.[e.meta.permission])return a("/unauthorized",{replace:!0})});export{u as default};

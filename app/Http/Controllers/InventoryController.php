@@ -198,35 +198,47 @@ class InventoryController extends Controller
       return new InventoryResource($inventory);
     }
 
-    public function search(Request $request) {
-      $query = $request->get('q');
-      $limit = (int) $request->get('limit', 20);
-      $page = (int) $request->get('page', 1);
-      $offset = ($page - 1) * $limit;
+    public function search(Request $request, HrisClientService $hris) {
+        $query = trim((string) $request->input('q', ''));
+        $limit = (int) $request->input('limit', 20);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $limit;
 
-      $inventories = Inventory::query()
-          ->when($query, fn($qBuilder) =>
-              $qBuilder->where('property_number', 'like', "%$query%")
-            ->orWhere(function ($queryBuilder) use ($query) {
-                $queryBuilder
-                    ->whereHas('employee', function ($q) use ($query) {
-                        $q->where('full_name', 'like', "%$query%");
+        $employeeMap = collect($hris->getEmployeesCached())
+            ->filter(fn ($e) => isset($e['id']))
+            ->keyBy(fn ($e) => (int) $e['id']);
+
+        $request->attributes->set('employeeMap', $employeeMap);
+
+        $inventories = Inventory::query()
+            ->when($query, function ($qBuilder) use ($query, $employeeMap) {
+                $needle = mb_strtolower($query);
+
+                $employeeIds = $employeeMap
+                    ->filter(function ($employee) use ($needle) {
+                        $name = mb_strtolower($employee['fullname'] ?? $employee['full_name'] ?? '');
+                        return $name !== '' && str_contains($name, $needle);
                     })
-                    ->orWhere(function ($q2) use ($query) {
-                        $q2->whereDoesntHave('employee')
-                            ->whereHas('parent_component.employee', function ($q3) use ($query) {
-                                $q3->where('full_name', 'like', "%$query%");
-                            });
-                    });
-            })
-          )
-          ->offset($offset)
-          ->limit($limit)
-          ->get();
+                    ->keys()
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all();
 
-      return response()->json([
-          'data' => InventoryResource::collection($inventories),
-      ]);
+                $qBuilder->where(function ($q) use ($query, $employeeIds) {
+                    $q->where('property_number', 'like', "%{$query}%");
+
+                    if (!empty($employeeIds)) {
+                        $q->orWhereIn('employee_id', $employeeIds);
+                    }
+                });
+            })
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => InventoryResource::collection($inventories),
+        ]);
     }
 
     public function searchMainAsset(Request $request) {

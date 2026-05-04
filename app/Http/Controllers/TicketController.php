@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Ticket;
-use App\Models\Profile;
 use App\Enums\TicketStatus;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,12 +13,18 @@ use App\Http\Requests\ResolveTicketRequest;
 use App\Http\Requests\SetTicketReleaseDateRequest;
 use App\Http\Requests\SetTicketServiceMethodRequest;
 use App\Services\ProfileEngagementService;
-use Illuminate\Support\Facades\Log;
+use App\Services\HrisClientService;
 
 class TicketController extends Controller
 {
-    public function index(Request $request) {
+    public function index(Request $request, HrisClientService $hris) {
       // Gate::authorize('it_service_index');
+
+      $employeeMap = collect($hris->getEmployeesCached())
+          ->filter(fn ($e) => isset($e['id']))
+          ->keyBy(fn ($e) => (int) $e['id']);
+
+      $request->attributes->set('employeeMap', $employeeMap);
 
       $profileId = Auth::user()->profile->id;
       $baseQuery = Ticket::query();
@@ -28,12 +33,26 @@ class TicketController extends Controller
           $search = $request->search;
           $baseQuery->where(function ($q) use ($search) {
               $q->where('concern', 'LIKE', "%{$search}%")
-                ->orWhere('ticket_number', 'LIKE', "%{$search}%");
+                ->orWhere('ticket_number', 'LIKE', "%{$search}%")
+                ->orWhere('full_name', 'LIKE', "%{$search}%");
           });
       }
 
       $query = (clone $baseQuery)
-          ->with(['personnel'])
+          ->with([
+              'profile',
+              'inventory',
+              'inventory.item_type',
+              'inventory.brand_model',
+              'inventory.parent_component',
+              'inventory.parent_component.item_type',
+              'inventory.parent_component.brand_model',
+              'agency',
+              'itService',
+              'solution',
+              'solution.author',
+              'personnel',
+          ])
           ->withCount([
               'personnel as accepted_by_me' => fn($q) => $q->where('profile_id', $profileId),
               'personnel as personnel_count',
@@ -56,16 +75,13 @@ class TicketController extends Controller
               case 'closed':
                   $query->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled]);
                   break;
-
           }
       }
 
-      // Query_status filter from dropdown (optional)
       if ($request->filled('query_status')) {
           $query->where('query_status', $request->query_status);
       }
 
-      // Sorting
       if ($request->filled('sort')) {
           $order = $request->input('order', 'asc');
           $query->orderBy($request->sort, $order);
@@ -75,7 +91,9 @@ class TicketController extends Controller
 
       $perPage = $request->input('per_page', 10);
       $currentPage = $request->input('page', 1);
-      $tickets = $query->paginate($perPage, ['*'], 'page', $currentPage)->appends($request->query());
+      $tickets = $query
+          ->paginate($perPage, ['*'], 'page', $currentPage)
+          ->appends($request->query());
 
       $counts = [
           'all' => (clone $baseQuery)->count(),
