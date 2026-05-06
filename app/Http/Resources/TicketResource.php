@@ -8,12 +8,13 @@ use Illuminate\Http\Request;
 use App\Http\Resources\InventoryResource;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Resources\ProfileResource;
-use App\Http\Resources\EmployeeResource;
 use App\Http\Resources\ItServiceResource;
 use Illuminate\Http\Resources\Json\JsonResource;
 use App\Http\Resources\SolutionResource;
 use App\Http\Resources\ItemTypeResource;
 use App\Http\Resources\AgencyResource;
+use App\Models\ProfileOffice;
+use Illuminate\Support\Facades\Log;
 
 class TicketResource extends JsonResource
 {
@@ -29,6 +30,29 @@ class TicketResource extends JsonResource
         $inventory = $this->whenLoaded('inventory');
         $agency = $this->whenLoaded('agency');
 
+        $employeeMap = $request->attributes->get('employeeMap');
+        $inventoryEmployee = $employeeMap?->get((int) $inventory?->employee_id);
+
+        $officeId =
+            data_get($inventoryEmployee, 'office_id') ??
+            data_get($inventoryEmployee, 'office.id') ??
+            data_get($inventoryEmployee, 'office.office_id') ??
+            data_get($inventoryEmployee, 'officeId') ??
+            data_get($inventoryEmployee, 'department_id') ??
+            data_get($inventoryEmployee, 'department.id');
+
+        $personnelOfficeAssigned = collect();
+
+        if ($officeId) {
+            $personnelOfficeAssigned = ProfileOffice::query()
+                ->with('profile')
+                ->where('office_id', (string) $officeId)
+                ->get()
+                ->pluck('profile')
+                ->filter()
+                ->values();
+        }
+
         return [
           'id' => $this->id,
           'profile' => ProfileResource::make($this->whenLoaded('profile')),
@@ -39,7 +63,7 @@ class TicketResource extends JsonResource
           'solution' => SolutionResource::make($this->whenLoaded('solution')),
           'agency' => AgencyResource::make($agency),
           'personnel_agency_assigned' => ProfileResource::collection($agency?->assigned_profiles ?? collect()),
-          'personnel_office_assigned' => ProfileResource::collection($inventory?->employee?->department?->assigned_profiles ?? collect()),
+          'personnel_office_assigned' => ProfileResource::collection($personnelOfficeAssigned),
 
           // core ticket fields
           'ticket_number' => $this->ticket_number,
