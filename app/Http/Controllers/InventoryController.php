@@ -18,6 +18,7 @@ class InventoryController extends Controller
         $tab     = (string) $request->get('tab', 'all');
         $perPage = (int) $request->input('per_page', 10);
         $page    = (int) $request->input('page', 1);
+        $officeId = $request->get('office_id');
 
         // ✅ HRIS employee map for InventoryResource
         $employeeMap = collect($hris->getEmployeesCached())
@@ -63,6 +64,33 @@ class InventoryController extends Controller
             }
         }
 
+        // ✅ Office filter via HRIS employee map
+        if ($request->filled('office_id')) {
+            $officeId = (string) $request->input('office_id');
+
+            $employeeIds = $employeeMap
+                ->filter(function ($employee) use ($officeId) {
+                    return (string) data_get($employee, 'office_id') === $officeId;
+                })
+                ->keys()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if (empty($employeeIds)) {
+                $baseQuery->whereRaw('1 = 0');
+            } else {
+                $baseQuery->where(function ($q) use ($employeeIds) {
+                    // Match direct employee (parent inventories)
+                    $q->whereIn('employee_id', $employeeIds)
+                      // OR match child components whose parent belongs to that office
+                      ->orWhereHas('parent_component', function ($q2) use ($employeeIds) {
+                          $q2->whereIn('employee_id', $employeeIds);
+                      });
+                });
+            }
+        }
+
         // ---------------------------
         // 2) APPLY TAB FILTER
         // ---------------------------
@@ -85,6 +113,25 @@ class InventoryController extends Controller
 
         $query = (clone $baseQuery);
         $applyTab($query);
+
+        if ($request->filled('office_id')) {
+            $officeId = (string) $request->input('office_id');
+
+            $employeeIds = $employeeMap
+                ->filter(function ($employee) use ($officeId) {
+                    return (string) data_get($employee, 'office_id') === $officeId;
+                })
+                ->keys()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if (empty($employeeIds)) {
+                $baseQuery->whereRaw('1 = 0');
+            } else {
+                $baseQuery->whereIn('employee_id', $employeeIds);
+            }
+        }
 
         // ✅ Sorting (optional)
         if ($request->filled('sort')) {
