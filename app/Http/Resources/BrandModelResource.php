@@ -18,17 +18,18 @@ class BrandModelResource extends JsonResource
     {
         return [
           'id' => $this->id,
-          'name' => $this->name,
-          'specification' => $this->specification,
-          'specifications_json' => $this->specifications_json,
-          'option_attribute_description' => $this->name ? "{$this->item_type->type}, {$this->specification} {$this->name}, {$this->brand->name}" : "{$this->item_type->type}, {$this->specification}, {$this->brand->name}",
-          'brand' => BrandResource::make($this->whenLoaded('brand')),
-          'item_type' => ItemTypeResource::make($this->whenLoaded('item_type')),
-          'image' => $this->image,
-          'year_released' => $this->year_released,
-          'status' => $this->status,
-          'created_at' => $this->created_at,
-          'updated_at' => $this->updated_at,
+            'name' => $this->name,
+            'specification' => $this->specification,
+            'specifications_json' => $this->specifications_json,
+            'option_attribute_description' => $this->display_name,
+            'display_name' => $this->display_name,
+            'brand' => BrandResource::make($this->whenLoaded('brand')),
+            'item_type' => ItemTypeResource::make($this->whenLoaded('item_type')),
+            'image' => $this->image,
+            'year_released' => $this->year_released,
+            'status' => $this->status,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }
