@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta charset="utf-8">
+    <title>Inventory Report</title>
+    <style>
+        @page {
+            margin: 18px 22px;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 9px;
+            color: #222;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 10px;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        .meta-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 12px;
+        }
+
+        .meta-table td {
+            border: 1px solid #cfcfcf;
+            padding: 4px 6px;
+            font-size: 9px;
+        }
+
+        .meta-label {
+            width: 90px;
+            font-weight: bold;
+            background: #f2f2f2;
+        }
+
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .report-table thead {
+            display: table-header-group;
+        }
+
+        .report-table tr {
+            page-break-inside: avoid;
+        }
+
+        .report-table th,
+        .report-table td {
+            border: 1px solid #bfbfbf;
+            padding: 5px 6px;
+            vertical-align: top;
+            word-wrap: break-word;
+            white-space: normal;
+        }
+
+        .report-table th {
+            background: #e9ecef;
+            text-transform: uppercase;
+            font-size: 8px;
+            text-align: center;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .no-col { width: 4%; }
+        .property-col { width: 11%; }
+        .employee-col { width: 14%; }
+        .division-col { width: 13%; }
+        .office-col { width: 11%; }
+        .item-type-col { width: 10%; }
+        .brand-col { width: 16%; }
+        .components-col { width: 21%; }
+
+        .no-records td {
+            text-align: center;
+            padding: 12px;
+            font-style: italic;
+        }
+
+        .summary-title {
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .summary-table {
+            width: 45%;
+            border-collapse: collapse;
+        }
+
+        .summary-table th,
+        .summary-table td {
+            border: 1px solid #cfcfcf;
+            padding: 5px 6px;
+            font-size: 9px;
+        }
+
+        .summary-table th {
+            background: #f2f2f2;
+            text-align: left;
+        }
+
+        .footer-note {
+            margin-top: 8px;
+            font-size: 8px;
+            color: #666;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Inventory Report</div>
+    <div class="subtitle">Generated inventory listing based on selected filters</div>
+
+    <table class="meta-table">
+        <tr>
+            <td class="meta-label">Generated At</td>
+            <td>{{ $generatedAt->format('Y-m-d h:i A') }}</td>
+            <td class="meta-label">Total Records</td>
+            <td>{{ count($rows) }}</td>
+        </tr>
+        <tr>
+            <td class="meta-label">Item Type</td>
+            <td>{{ $filters['item_type'] ?: 'All' }}</td>
+            <td class="meta-label">Employee</td>
+            <td>{{ $filters['employee'] ?: 'All' }}</td>
+        </tr>
+        <tr>
+            <td class="meta-label">Office</td>
+            <td>{{ $filters['office'] ?: 'All' }}</td>
+            <td class="meta-label">Status</td>
+            <td>{{ $filters['status'] ?: 'All' }}</td>
+        </tr>
+    </table>
+
+    <table class="report-table">
+        <thead>
+            <tr>
+                <th class="no-col">NO.</th>
+                <th class="division-col">DIVISION / SECTION</th>
+                <th class="employee-col">ACTUAL USER</th>
+                <th class="property-col">PROPERTY NUMBER</th>
+                <th class="office-col">DATE ACQUIRED</th>
+                <th class="item-type-col">ITEM TYPE</th>
+                <th class="brand-col">BRAND / MODEL</th>
+                <th class="components-col">CHILD COMPONENTS</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($rows as $index => $row)
+                <tr>
+                    <td class="text-center">{{ $index + 1 }}</td>
+                    <td>{{ $row['division_section'] ?: '—' }}</td>
+                    <td>{{ $row['employee_name'] ?: '—' }}</td>
+                    <td>{{ $row['property_number'] ?: '—' }}</td>
+                    <td>{{ $row['date_acquired'] ?: '—' }}</td>
+                    <td>{{ $row['item_type'] ?: '—' }}</td>
+                    <td>{{ $row['brand_model'] ?: '—' }}</td>
+                    <td style="white-space: pre-line;">{{ $row['child_components'] ?: '—' }}</td>
+                </tr>
+            @empty
+                <tr class="no-records">
+                    <td colspan="8">No records found.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+
+    <div class="summary-title">Item Type Summary</div>
+
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Item Type</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($summary as $itemType => $count)
+                <tr>
+                    <td>{{ $itemType ?: 'Unspecified' }}</td>
+                    <td>{{ $count }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="2">No summary available.</td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+
+    <div class="footer-note">
+        Generated by ITSMS
+    </div>
+</body>
+</html>
