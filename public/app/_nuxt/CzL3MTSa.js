@@ -1,0 +1,1 @@
+import{h as s,b as a,c as n,o,d as t}from"./BDIwtgZP.js";const d=s({__name:"index",setup(r){return a({title:"Dashboard"}),(i,e)=>(o(),n("div",null,e[0]||(e[0]=[t("h1",null,"Pages Index",-1),t("p",null,"Lorem ipsum dolor sit amet consectetur adipisicing elit.",-1)])))}});export{d as default};
