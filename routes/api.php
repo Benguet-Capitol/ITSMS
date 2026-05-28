@@ -123,6 +123,8 @@ Route::group(['middleware' => ['auth:sanctum', AuthGates::class]], function () {
   Route::post('tickets/{ticket}/reopen', [TicketController::class, 'reopen']);
   Route::post('tickets/{ticket}/set-service-method', [TicketController::class, 'setServiceMethod']);
   Route::post('tickets/{ticket}/set-release-date', [TicketController::class, 'setReleaseDate']);
+  Route::post('tickets/{ticket}/assess', [TicketController::class, 'assess']);
+  Route::get('tickets/{ticket}/assessment-report', [TicketController::class, 'assessmentReport']);
   
 
   // Search Routes

@@ -105,4 +105,9 @@ class Ticket extends Model
     public function agency() {
       return $this->belongsTo(Agency::class);
     }
+
+    public function assessment() {
+        return $this->hasOne(TicketAssessment::class);
+    }
 }
+

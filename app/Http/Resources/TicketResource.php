@@ -95,6 +95,7 @@ class TicketResource extends JsonResource
           'is_open' => $this->request_status === TicketStatus::Open,
           'is_closed' => in_array($this->query_status, [
               TicketStatus::Resolved,
+              TicketStatus::Assessed,
               TicketStatus::Cancelled,
           ]),
           'is_in_progress' => $this->query_status === TicketStatus::InProgress,
@@ -108,6 +109,17 @@ class TicketResource extends JsonResource
               TicketStatus::AwaitingUser,
               TicketStatus::AwaitingVendor
           ]) && !($this->accepted_by_me ?? false),
+
+          'assessment' => $this->whenLoaded('assessment', fn () => [
+              'findings'              => $this->assessment->findings,
+              'recommendations'       => $this->assessment->recommendations,
+              'replacement_available' => $this->assessment->replacement_available,
+              'specifications'        => $this->assessment->specifications,
+              'components'            => $this->assessment->components,
+              'reviewed_by'           => $this->assessment->reviewed_by,
+              'assessed_by'           => $this->assessment->assessed_by,
+              'created_at'            => $this->assessment->created_at,
+          ]),
         ];
     }
 }

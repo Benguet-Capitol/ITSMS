@@ -20,6 +20,10 @@ class Profile extends Model
         'last_seen_at',
     ];
 
+    protected $casts = [
+        'name' => 'array',
+    ];
+
     const STATUS_ONLINE = 'online';
     const STATUS_OFFLINE = 'offline';
 
@@ -73,6 +77,19 @@ class Profile extends Model
                 'abbreviation' => $office->office_code,
             ];
         })->toArray();
+    }
+
+    public function getFormattedNameAttribute(): string {
+        $name    = $this->name ?? [];
+        $first   = strtoupper(trim($name['firstname'] ?? ''));
+        $middle  = strtoupper(trim($name['middlename'] ?? ''));
+        $last    = strtoupper(trim($name['lastname'] ?? ''));
+        $suffix  = trim($name['suffix'] ?? '');
+
+        $middleInitial = $middle ? strtoupper($middle[0]) . '.' : '';
+        $suffixPart    = $suffix ? ', ' . strtoupper(ltrim($suffix)) : '';
+
+        return trim("{$first} {$middleInitial} {$last}{$suffixPart}");
     }
 
 }

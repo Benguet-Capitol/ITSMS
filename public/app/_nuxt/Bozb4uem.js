@@ -1,0 +1,1 @@
+import{aR as s,E as r,aw as a}from"./BlLXBiEo.js";const u=s(e=>{if(!e.meta.permission)return;if(!r().value?.permissions?.[e.meta.permission])return a("/unauthorized",{replace:!0})});export{u as default};

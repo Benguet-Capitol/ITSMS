@@ -12,6 +12,7 @@ enum TicketStatus: string
     case AwaitingUser = 'awaiting_user'; // Only when accepted
     case AwaitingVendor = 'awaiting_vendor'; // Only when accepted
     case Resolved = 'resolved';
+    case Assessed = 'assessed';
     case Cancelled = 'cancelled';
     
     // Request Status

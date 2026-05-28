@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Ticket;
 use App\Enums\TicketStatus;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Http\Resources\TicketResource;
-use App\Http\Requests\StoreTicketRequest;
-use App\Http\Requests\UpdateTicketRequest;
+use App\Http\Requests\AssessTicketRequest;
 use App\Http\Requests\ResolveTicketRequest;
 use App\Http\Requests\SetTicketReleaseDateRequest;
 use App\Http\Requests\SetTicketServiceMethodRequest;
-use App\Services\ProfileEngagementService;
+use App\Http\Requests\StoreTicketRequest;
+use App\Http\Requests\UpdateTicketRequest;
+use App\Http\Resources\TicketResource;
+use App\Models\Ticket;
+use App\Models\TicketAssessment;
 use App\Services\HrisClientService;
+use App\Services\ProfileEngagementService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
@@ -215,12 +219,52 @@ class TicketController extends Controller
     }
 
     public function reopen(Request $request, Ticket $ticket) {
+      $ticket->assessment()->delete();
+
       $ticket->update([
             'query_status' => TicketStatus::InProgress,
             'request_status' => TicketStatus::Reopened,
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
+
+        return new TicketResource($ticket);
+    }
+
+    public function assess(AssessTicketRequest $request, Ticket $ticket, HrisClientService $hris) {
+        $data = $request->validated();
+
+        // Resolve assessed_by — match by employee_id/employee_id_number, fallback to auth user name
+        $user           = Auth::user();
+        $user_profile_designation = $user?->profile?->designation ?? '';
+        $authEmployeeId = (string) ($user?->profile?->employee_id ?? '');
+
+        $authEmployee = collect($hris->getEmployees())
+            ->first(function ($e) use ($authEmployeeId) {
+                return (string) ($e['employee_id'] ?? $e['employee_id_number'] ?? $e['id'] ?? '') === $authEmployeeId;
+            });
+
+        $assessedBy = $user->profile?->formatted_name ?? $user->name;
+
+        // Create or update assessment
+        $ticket->assessment()->updateOrCreate(
+            ['ticket_id' => $ticket->id],
+            [
+                ...$data,
+                'assessed_by' => $assessedBy,
+                'assessed_by_position' => $user_profile_designation,
+            ]
+        );
+
+        // Update ticket status
+        $ticket->update([
+            'query_status'   => TicketStatus::Assessed,
+            'request_status' => TicketStatus::Closed,
+        ]);
+
+        ProfileEngagementService::syncTicket($ticket);
+
+        $ticket->load('assessment');
 
         return new TicketResource($ticket);
     }
@@ -239,5 +283,83 @@ class TicketController extends Controller
       $ticket->update($data);
 
       return new TicketResource($ticket);
+    }
+
+    public function assessmentReport(Ticket $ticket, HrisClientService $hris) {
+        $ticket->load([
+            'assessment',
+            'inventory',
+            'inventory.item_type',
+            'inventory.brand_model',
+            'inventory.brand_model.item_type',
+            'item_type',
+            'profile',
+        ]);
+
+        if (!$ticket->assessment) {
+            return response()->json(['message' => 'No assessment found for this ticket.'], 404);
+        }
+
+        // Resolve employee from HRIS
+        $employeeMap = collect($hris->getEmployeesCached())
+            ->filter(fn ($e) => isset($e['id']))
+            ->keyBy(fn ($e) => (int) $e['id']);
+
+        // Employee is on the inventory (not directly on ticket)
+        $employeeId = $ticket->inventory?->employee_id ?? $ticket->employee_id ?? null;
+        $employee   = $employeeMap->get((int) $employeeId);
+
+        // Item type — prefer inventory, fall back to ticket
+        $itemType = $ticket->inventory?->item_type?->type
+            ?? $ticket->item_type?->type
+            ?? '—';
+
+        // Brand/model
+        $brandModel = null;
+        if ($ticket->inventory?->brand_model) {
+            $bm = $ticket->inventory->brand_model;
+            $brandModel = $bm->name
+                ? "{$bm->item_type?->type} {$bm->specification}, {$bm->name}"
+                : "{$bm->item_type?->type}, {$bm->specification}";
+        }
+
+        $data = [
+            'ticket'       => $ticket,
+            'assessment'   => $ticket->assessment,
+            'date'         => now()->format('F d, Y'),
+            'control_no'   => $ticket->ticket_number,
+            'office'       => data_get($employee, 'office_desc') ?? '—',
+            'item_name'    => $itemType,
+            'property_no'  => $ticket->inventory?->property_number ?? '—',
+            'date_acquired'=> $ticket->inventory?->date_acquired
+                                ? \Carbon\Carbon::parse($ticket->inventory->date_acquired)->format('F d, Y')
+                                : '—',
+            'issued_to'    => data_get($employee, 'fullname')
+                                ?? data_get($employee, 'full_name')
+                                ?? $ticket->full_name
+                                ?? '—',
+            'brand_model'  => $brandModel ?? '—',
+            'serial_number'=> $ticket->inventory?->serial_number ?? '—',
+            'concern'      => $ticket->concern,
+            'components'   => $ticket->assessment->components ?? [],
+            'system_unit_parts' => [
+                'PROCESSOR', 'RAM/ Memory Module', 'SOLID STATE DRIVE',
+                'HARD DISK', 'VIDEO CARD', 'POWER SUPPLY',
+                'MOTHERBOARD', 'OPTICAL DRIVE', 'MONITOR', 'OTHERS',
+            ],
+            'peripherals' => [
+                'KEYBOARD', 'MOUSE', 'SPEAKER', 'USB/FLASHDRIVE',
+                'AVR', 'UPS', 'PRINTER', 'SCANNER', 'Router / Switch', 'OTHERS',
+            ],
+        ];
+
+        $pdf = Pdf::loadView('reports.ticket-assessment', $data)
+            ->setPaper('a4', 'portrait');
+
+        $filename = 'Assessment-' . $ticket->ticket_number . '-' . now()->format('Y-m-d_Hi') . '.pdf';
+
+        return $pdf->download($filename, [
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 }
