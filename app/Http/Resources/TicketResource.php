@@ -14,7 +14,6 @@ use App\Http\Resources\SolutionResource;
 use App\Http\Resources\ItemTypeResource;
 use App\Http\Resources\AgencyResource;
 use App\Models\ProfileOffice;
-use Illuminate\Support\Facades\Log;
 
 class TicketResource extends JsonResource
 {

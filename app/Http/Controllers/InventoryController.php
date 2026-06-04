@@ -8,54 +8,43 @@ use App\Http\Resources\InventoryResource;
 use App\Models\InventoryInternalComponent;
 use App\Http\Requests\StoreInventoryRequest;
 use App\Http\Requests\UpdateInventoryRequest;
-use Illuminate\Support\Facades\Cache;
 use App\Services\HrisClientService;
 
 class InventoryController extends Controller
 {
     public function index(Request $request, HrisClientService $hris) {
-        $search  = trim((string) $request->get('search', ''));
-        $tab     = (string) $request->get('tab', 'all');
-        $perPage = (int) $request->input('per_page', 10);
-        $page    = (int) $request->input('page', 1);
-        $officeId = $request->get('office_id');
+        $search   = trim((string) $request->input('search', ''));
+        $tab      = (string) $request->input('tab', 'all');
+        $perPage  = (int) $request->input('per_page', 10);
+        $page     = (int) $request->input('page', 1);
+        $officeId = $request->input('office_id');
 
-        // ✅ HRIS employee map for InventoryResource
-        $employeeMap = collect($hris->getEmployeesCached())
-            ->filter(fn ($e) => isset($e['id']))
-            ->keyBy(fn ($e) => (int) $e['id']);
-
-        $request->attributes->set('employeeMap', $employeeMap);
-
-        // ---------------------------
-        // 1) BASE QUERY (shared by list + counts)
-        // ---------------------------
         $baseQuery = Inventory::query();
 
-        // ✅ Search
+        // ── Search ──────────────────────────────────────────────────────────────
         if ($search !== '') {
-            // Name search -> resolve HRIS IDs -> filter inventories.employee_id
             if (preg_match('/[a-zA-Z]/', $search)) {
-                $needle = mb_strtolower($search);
-
-                $ids = $employeeMap
-                    ->filter(function ($e) use ($needle) {
-                        $name = mb_strtolower($e['fullname'] ?? $e['full_name'] ?? '');
-                        return $name !== '' && str_contains($name, $needle);
-                    })
+                // Name search — ask HRIS only for matching employees
+                $matched = collect($hris->searchEmployees($search))
+                    ->filter(fn ($e) => isset($e['id']))
                     ->keys()
                     ->map(fn ($v) => (int) $v)
                     ->values()
                     ->all();
 
-                // no matches => empty
-                if (empty($ids)) {
-                    $baseQuery->whereRaw('1=0');
-                } else {
-                    $baseQuery->whereIn('employee_id', $ids);
-                }
+                // Re-key by id since searchEmployees returns a list, not a keyed map
+                $ids = collect($hris->searchEmployees($search))
+                    ->filter(fn ($e) => isset($e['id']))
+                    ->pluck('id')
+                    ->map(fn ($v) => (int) $v)
+                    ->values()
+                    ->all();
+
+                empty($ids)
+                    ? $baseQuery->whereRaw('1=0')
+                    : $baseQuery->whereIn('employee_id', $ids);
+
             } else {
-                // Inventory field search
                 $baseQuery->where(function ($q) use ($search) {
                     $q->where('property_number', 'like', "%{$search}%")
                       ->orWhere('ip_address', 'like', "%{$search}%")
@@ -64,16 +53,14 @@ class InventoryController extends Controller
             }
         }
 
-        // ✅ Office filter via HRIS employee map
+        // ── Office filter ────────────────────────────────────────────────────────
         if ($request->filled('office_id')) {
-            $officeId = (string) $request->input('office_id');
+            $oid = (string) $request->input('office_id');
 
-            $employeeIds = $employeeMap
-                ->filter(function ($employee) use ($officeId) {
-                    return (string) data_get($employee, 'office_id') === $officeId;
-                })
-                ->keys()
-                ->map(fn ($id) => (int) $id)
+            $employeeIds = collect($hris->getEmployeesWithParams(['office_id' => $oid]))
+                ->filter(fn ($e) => isset($e['id']))
+                ->pluck('id')
+                ->map(fn ($v) => (int) $v)
                 ->values()
                 ->all();
 
@@ -81,9 +68,7 @@ class InventoryController extends Controller
                 $baseQuery->whereRaw('1 = 0');
             } else {
                 $baseQuery->where(function ($q) use ($employeeIds) {
-                    // Match direct employee (parent inventories)
                     $q->whereIn('employee_id', $employeeIds)
-                      // OR match child components whose parent belongs to that office
                       ->orWhereHas('parent_component', function ($q2) use ($employeeIds) {
                           $q2->whereIn('employee_id', $employeeIds);
                       });
@@ -91,52 +76,16 @@ class InventoryController extends Controller
             }
         }
 
-        // ---------------------------
-        // 2) APPLY TAB FILTER
-        // ---------------------------
-        $applyTab = function ($q) use ($tab) {
-            switch ($tab) {
-                case 'parent_components':
-                    $q->whereNull('parent_component_id');
-                    break;
-
-                case 'child_components':
-                    $q->whereNotNull('parent_component_id');
-                    break;
-
-                case 'all':
-                default:
-                    // no filter
-                    break;
-            }
+        // ── Tab filter ───────────────────────────────────────────────────────────
+        $query = clone $baseQuery;
+        match ($tab) {
+            'parent_components' => $query->whereNull('parent_component_id'),
+            'child_components'  => $query->whereNotNull('parent_component_id'),
+            default             => null,
         };
 
-        $query = (clone $baseQuery);
-        $applyTab($query);
-
-        if ($request->filled('office_id')) {
-            $officeId = (string) $request->input('office_id');
-
-            $employeeIds = $employeeMap
-                ->filter(function ($employee) use ($officeId) {
-                    return (string) data_get($employee, 'office_id') === $officeId;
-                })
-                ->keys()
-                ->map(fn ($id) => (int) $id)
-                ->values()
-                ->all();
-
-            if (empty($employeeIds)) {
-                $baseQuery->whereRaw('1 = 0');
-            } else {
-                $baseQuery->whereIn('employee_id', $employeeIds);
-            }
-        }
-
-        // ✅ Sorting (optional)
         if ($request->filled('sort')) {
-            $order = $request->input('order', 'asc');
-            $query->orderBy($request->sort, $order);
+            $query->orderBy($request->sort, $request->input('order', 'asc'));
         } else {
             $query->latest();
         }
@@ -145,27 +94,30 @@ class InventoryController extends Controller
             ->paginate($perPage, ['*'], 'page', $page)
             ->appends($request->query());
 
-        // ---------------------------
-        // 3) COUNTS (respect search; count per tab)
-        // ---------------------------
+        $allEmployees = collect($hris->getEmployeesCached(10))
+            ->filter(fn ($e) => isset($e['id']))
+            ->keyBy(fn ($e) => (int) $e['id']);
+
+        $request->attributes->set('employeeMap', $allEmployees);
+
+        // ── Counts ───────────────────────────────────────────────────────────────
         $counts = [
-            'all' => (clone $baseQuery)->count(),
+            'all'               => (clone $baseQuery)->count(),
             'parent_components' => (clone $baseQuery)->whereNull('parent_component_id')->count(),
-            'child_components' => (clone $baseQuery)->whereNotNull('parent_component_id')->count(),
+            'child_components'  => (clone $baseQuery)->whereNotNull('parent_component_id')->count(),
         ];
 
         return response()->json([
             'data' => InventoryResource::collection($inventories),
             'meta' => [
-                'total' => $inventories->total(),
-                'per_page' => $inventories->perPage(),
+                'total'        => $inventories->total(),
+                'per_page'     => $inventories->perPage(),
                 'current_page' => $inventories->currentPage(),
-                'last_page' => $inventories->lastPage(),
-                'counts' => $counts,
+                'last_page'    => $inventories->lastPage(),
+                'counts'       => $counts,
             ],
         ]);
     }
-
 
     public function store(StoreInventoryRequest $request) {
       // Gate::authorize('item_store');
@@ -183,6 +135,8 @@ class InventoryController extends Controller
           ]);
         }
       }
+
+      $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
 
       return new InventoryResource($inventory);
     }
@@ -234,6 +188,8 @@ class InventoryController extends Controller
         $inventory->internal_components()->delete();
       }
 
+      $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
+
       return new InventoryResource($inventory);
     }
 
@@ -246,28 +202,20 @@ class InventoryController extends Controller
     }
 
     public function search(Request $request, HrisClientService $hris) {
-        $query = trim((string) $request->input('q', ''));
-        $limit = (int) $request->input('limit', 20);
-        $page = (int) $request->input('page', 1);
+        $query  = trim((string) $request->input('q', ''));
+        $limit  = (int) $request->input('limit', 20);
+        $page   = (int) $request->input('page', 1);
         $offset = ($page - 1) * $limit;
 
-        $employeeMap = collect($hris->getEmployeesCached())
-            ->filter(fn ($e) => isset($e['id']))
-            ->keyBy(fn ($e) => (int) $e['id']);
-
-        $request->attributes->set('employeeMap', $employeeMap);
-
         $inventories = Inventory::query()
-            ->when($query, function ($qBuilder) use ($query, $employeeMap) {
+            ->when($query, function ($qBuilder) use ($query, $hris) {
                 $needle = mb_strtolower($query);
 
-                $employeeIds = $employeeMap
-                    ->filter(function ($employee) use ($needle) {
-                        $name = mb_strtolower($employee['fullname'] ?? $employee['full_name'] ?? '');
-                        return $name !== '' && str_contains($name, $needle);
-                    })
-                    ->keys()
-                    ->map(fn ($id) => (int) $id)
+                // Targeted name search — no full list fetch
+                $employeeIds = collect($hris->searchEmployees($query))
+                    ->filter(fn ($e) => isset($e['id']))
+                    ->pluck('id')
+                    ->map(fn ($v) => (int) $v)
                     ->values()
                     ->all();
 
@@ -282,6 +230,12 @@ class InventoryController extends Controller
             ->offset($offset)
             ->limit($limit)
             ->get();
+
+        $employeeMap = collect($hris->getEmployeesCached(10))
+            ->filter(fn ($e) => isset($e['id']))
+            ->keyBy(fn ($e) => (int) $e['id']);
+
+        $request->attributes->set('employeeMap', $employeeMap);
 
         return response()->json([
             'data' => InventoryResource::collection($inventories),
@@ -314,5 +268,20 @@ class InventoryController extends Controller
       return response()->json([
           'data' => InventoryResource::collection($inventories),
       ]);
+    }
+
+    private function injectEmployeeMap(Request $request, $employeeId, HrisClientService $hris): void {
+        $employeeMap = collect();
+
+        if ($employeeId) {
+            $found = $hris->getEmployeesWithParams(['employee_id' => (string) $employeeId], 30);
+            foreach ($found as $e) {
+                if (isset($e['id'])) {
+                    $employeeMap->put((int) $e['id'], $e);
+                }
+            }
+        }
+
+        $request->attributes->set('employeeMap', $employeeMap);
     }
 }

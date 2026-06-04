@@ -5,7 +5,6 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use App\Http\Resources\BrandModelResource;
-use App\Http\Resources\EmployeeResource;
 use App\Http\Resources\ItemTypeResource;
 use App\Http\Resources\InventoryInternalComponentResource;
 

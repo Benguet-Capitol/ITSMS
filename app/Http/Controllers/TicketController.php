@@ -11,24 +11,16 @@ use App\Http\Requests\StoreTicketRequest;
 use App\Http\Requests\UpdateTicketRequest;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
-use App\Models\TicketAssessment;
 use App\Services\HrisClientService;
 use App\Services\ProfileEngagementService;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\DomPDF\Facade\Pdf; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 
 class TicketController extends Controller
 {
     public function index(Request $request, HrisClientService $hris) {
       // Gate::authorize('it_service_index');
-
-      $employeeMap = collect($hris->getEmployeesCached())
-          ->filter(fn ($e) => isset($e['id']))
-          ->keyBy(fn ($e) => (int) $e['id']);
-
-      $request->attributes->set('employeeMap', $employeeMap);
 
       $profileId = Auth::user()->profile->id;
       $baseQuery = Ticket::query();
@@ -98,6 +90,12 @@ class TicketController extends Controller
       $tickets = $query
           ->paginate($perPage, ['*'], 'page', $currentPage)
           ->appends($request->query());
+
+      $employeeMap = collect($hris->getEmployeesCached(10))
+        ->filter(fn ($e) => isset($e['id']))
+        ->keyBy(fn ($e) => (int) $e['id']);
+
+      $request->attributes->set('employeeMap', $employeeMap);
 
       $counts = [
           'all' => (clone $baseQuery)->count(),

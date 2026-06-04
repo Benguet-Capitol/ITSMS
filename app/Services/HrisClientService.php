@@ -60,9 +60,10 @@ class HrisClientService
      *
      * @deprecated Use getEmployees() or searchEmployees() directly.
      */
-    public function getEmployeesCached(int $minutes = 5): array
-    {
-        return $this->getEmployees();
+    public function getEmployeesCached(int $minutes = 5): array {
+        return Cache::remember('hris:employees:all', now()->addMinutes($minutes), function () {
+            return $this->getEmployees();
+        });
     }
 
     /**
