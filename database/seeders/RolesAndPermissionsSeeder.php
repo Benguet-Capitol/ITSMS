@@ -206,7 +206,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 // 'common_problems.delete',
 
                 // 'employees.view',
-                // 'offices.view',
+                'offices.view',
             ],
 
             'IT Technical' => [
@@ -247,7 +247,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 // 'common_problems.view',
 
                 // 'employees.view',
-                // 'offices.view',
+                'offices.view',
             ],
 
             'Encoder' => [
@@ -284,6 +284,8 @@ class RolesAndPermissionsSeeder extends Seeder
                 'measurement_units.create',
                 'measurement_units.update',
                 'measurement_units.delete',
+
+                'offices.view',
 
             ],
 
