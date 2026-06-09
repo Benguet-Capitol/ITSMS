@@ -207,7 +207,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 // 'common_problems.update',
                 // 'common_problems.delete',
 
-                // 'employees.view',
+                'employees.view',
                 'offices.view',
             ],
 
@@ -249,7 +249,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'measurement_units.view',
                 // 'common_problems.view',
 
-                // 'employees.view',
+                'employees.view',
                 'offices.view',
             ],
 
@@ -288,6 +288,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'measurement_units.update',
                 'measurement_units.delete',
 
+                'employees.view',
                 'offices.view',
 
             ],
@@ -296,6 +297,9 @@ class RolesAndPermissionsSeeder extends Seeder
                 'dashboard.view',
                 'tickets.view',
                 'tickets.create',
+
+                'employees.view',
+                'employees.view',
             ],
         ];
 
