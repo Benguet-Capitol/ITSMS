@@ -23,6 +23,7 @@ class RolesAndPermissionsSeeder extends Seeder
             'tickets.create',
             'tickets.update',
             'tickets.delete',
+            'tickets.print_assessment',
 
             // Inventory
             'inventories.view',
@@ -127,6 +128,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 // Tickets — intake only (create + view; no lifecycle transitions)
                 'tickets.view',
                 'tickets.create',
+                'tickets.print_assessment',
 
                 // Inventory — full CRUD + reports
                 'inventories.view',
@@ -217,6 +219,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'tickets.create',
                 'tickets.update',
                 'tickets.delete',
+                'tickets.print_assessment',
 
                 // Inventory — view + update (no create/delete)
                 'inventories.view',
