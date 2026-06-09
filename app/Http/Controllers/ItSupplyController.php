@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\ItSupply;
-use App\Http\Resources\ItSupplyResource;
 use App\Http\Requests\StoreItSupplyRequest;
 use App\Http\Requests\UpdateItSupplyRequest;
+use App\Http\Resources\ItSupplyResource;
+use App\Models\ItSupply;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ItSupplyController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('item_type_index');
+      Gate::authorize('it_supplies.view');
 
       $query = ItSupply::query();
 
@@ -56,7 +57,7 @@ class ItSupplyController extends Controller
     }
 
     public function store(StoreItSupplyRequest $request) {
-      // Gate::authorize('item_store');
+      Gate::authorize('it_supplies.create');
       
       $data = $request->validated();
 
@@ -66,7 +67,7 @@ class ItSupplyController extends Controller
     }
 
     public function update(UpdateItSupplyRequest $request, ItSupply $itSupply) {
-      // Gate::authorize('item_update');
+      Gate::authorize('it_supplies.update');
 
       $data = $request->validated();
 
@@ -76,7 +77,7 @@ class ItSupplyController extends Controller
     }
 
     public function destroy(ItSupply $itSupply) {
-      // Gate::authorize('item_destroy');
+      Gate::authorize('it_supplies.delete');
 
       $itSupply->delete();
       
@@ -84,17 +85,21 @@ class ItSupplyController extends Controller
     }
 
     public function select() {
-        $itSupplies = ItSupply::all();
+      Gate::authorize('it_supplies.view');
+      
+      $itSupplies = ItSupply::all();
 
-        return response()->json([
-          'data' => ItSupplyResource::collection($itSupplies)
-        ]);
+      return response()->json([
+        'data' => ItSupplyResource::collection($itSupplies)
+      ]);
     }
 
     public function search(Request $request) {
-      $query = $request->get('q');
-      $limit = (int) $request->get('limit', 20);
-      $page = (int) $request->get('page', 1);
+      Gate::authorize('it_supplies.view');
+      
+      $query = $request->input('q');
+      $limit = (int) $request->input('limit', 20);
+      $page = (int) $request->input('page', 1);
       $offset = ($page - 1) * $limit;
 
       $it_supplies = ItSupply::query()

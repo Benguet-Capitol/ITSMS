@@ -17,7 +17,7 @@ use App\Models\ProfileOffice;
 class UserController extends Controller
 {
     public function index(Request $request) {
-      Gate::authorize('user_index');
+      Gate::authorize('users.view');
 
       $query = User::query();
 
@@ -59,91 +59,93 @@ class UserController extends Controller
     }
 
     public function store(StoreUserRequest $request) {
-        Gate::authorize('user_store');
+      Gate::authorize('users.create');
 
-        $data = $request->validated();
-        $data['img_path'] = null;
+      $data = $request->validated();
+      $data['img_path'] = null;
 
-        if ($request->hasFile('photo_id')) {
-            $path = $request->file('photo_id')->store('images/users/personnel', 'public');
-            $data['img_path'] = $path;
-        }
+      if ($request->hasFile('photo_id')) {
+          $path = $request->file('photo_id')->store('images/users/personnel', 'public');
+          $data['img_path'] = $path;
+      }
 
-        $user = User::create([
-            'username' => $data['username'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-        ]);
+      $user = User::create([
+          'username' => $data['username'],
+          'email' => $data['email'],
+          'password' => Hash::make($data['password']),
+      ]);
 
-        if ($user) {
-            $user->roles()->syncWithoutDetaching([$data['role']]);
+      if ($user) {
+          $user->roles()->syncWithoutDetaching([$data['role']]);
 
-            $profile = Profile::create([
-                'user_id' => $user->id,
-                'display_name' => $data['display_name'],
-                'name' => $data['name'],
-                'gender' => $data['gender'],
-                'designation' => $data['designation'],
-                'engagement' => 'ready',
-                'img_path' => $data['img_path'],
-            ]);
+          $profile = Profile::create([
+              'user_id' => $user->id,
+              'display_name' => $data['display_name'],
+              'name' => $data['name'],
+              'gender' => $data['gender'],
+              'designation' => $data['designation'],
+              'engagement' => 'ready',
+              'img_path' => $data['img_path'],
+          ]);
 
-            $this->syncProfileOffices($profile, $data['offices_assigned'] ?? null);
-            $profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
-        }
+          $this->syncProfileOffices($profile, $data['offices_assigned'] ?? null);
+          $profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
+      }
 
-        return new UserResource($user);
+      return new UserResource($user);
     }
 
     public function update(UpdateUserRequest $request, User $user) {
-        $data = $request->validated();
+      Gate::authorize('users.update');
+      
+      $data = $request->validated();
 
-        $user_data = [];
-        $profile_data = [];
-        $changedData = [];
+      $user_data = [];
+      $profile_data = [];
+      $changedData = [];
 
-        foreach ($data as $key => $value) {
-            if ($user->$key !== $value) {
-                $changedData[$key] = $value;
+      foreach ($data as $key => $value) {
+          if ($user->$key !== $value) {
+              $changedData[$key] = $value;
 
-                if ($key === 'email' || $key === 'username' || $key === 'role') {
-                    $user_data[$key] = $value;
-                } else if ($key === 'display_name' || $key === 'name' || $key === 'gender' || $key === 'designation') {
-                    $profile_data[$key] = $value;
-                }
-            }
-        }
+              if ($key === 'email' || $key === 'username' || $key === 'role') {
+                  $user_data[$key] = $value;
+              } else if ($key === 'display_name' || $key === 'name' || $key === 'gender' || $key === 'designation') {
+                  $profile_data[$key] = $value;
+              }
+          }
+      }
 
-        if (!empty($changedData)) {
-            if ($request->hasFile('photo_id')) {
-                $storage_public = Storage::disk('public');
+      if (!empty($changedData)) {
+          if ($request->hasFile('photo_id')) {
+              $storage_public = Storage::disk('public');
 
-                if ($user->profile->img_path && $storage_public->exists($user->profile->img_path)) {
-                    $storage_public->delete($user->profile->img_path);
-                }
+              if ($user->profile->img_path && $storage_public->exists($user->profile->img_path)) {
+                  $storage_public->delete($user->profile->img_path);
+              }
 
-                $path = $request->file('photo_id')->store('images/users/personnel', 'public');
-                $profile_data['img_path'] = $path;
-            }
+              $path = $request->file('photo_id')->store('images/users/personnel', 'public');
+              $profile_data['img_path'] = $path;
+          }
 
-            $user->update($user_data);
+          $user->update($user_data);
 
-            if ($user) {
-                $user->roles()->sync([$data['role']]);
+          if ($user) {
+              $user->roles()->sync([$data['role']]);
 
-                Profile::where('user_id', $user->id)->update($profile_data);
+              Profile::where('user_id', $user->id)->update($profile_data);
 
-                $user->refresh();
-                $this->syncProfileOffices($user->profile, $data['offices_assigned'] ?? null);
-                $user->profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
-            }
-        }
+              $user->refresh();
+              $this->syncProfileOffices($user->profile, $data['offices_assigned'] ?? null);
+              $user->profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
+          }
+      }
 
-        return new UserResource($user->fresh());
+      return new UserResource($user->fresh());
     }
 
     public function destroy(User $user) {
-      // Gate::authorize('user_destroy');
+      Gate::authorize('users.delete');
 
       $storage_public = Storage::disk('public');
       if ($user->img_path && $storage_public->exists($user->img_path)) {

@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\CommonProblem;
-use App\Http\Resources\CommonProblemResource;
 use App\Http\Requests\StoreCommonProblemRequest;
 use App\Http\Requests\UpdateCommonProblemRequest;
+use App\Http\Resources\CommonProblemResource;
+use App\Models\CommonProblem;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class CommonProblemController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('item_type_index');
+      Gate::authorize('common_problems.view');
 
       $query = CommonProblem::query();
 
@@ -49,7 +50,7 @@ class CommonProblemController extends Controller
     }
 
     public function store(StoreCommonProblemRequest $request) {
-      // Gate::authorize('item_type_store');
+      Gate::authorize('common_problems.create');
       
       $data = $request->validated();
 
@@ -59,7 +60,7 @@ class CommonProblemController extends Controller
     }
 
     public function update(UpdateCommonProblemRequest $request, CommonProblem $common_problem) {
-      // Gate::authorize('item_type_update');
+      Gate::authorize('common_problems.update');
 
       $data = $request->validated();
 
@@ -69,7 +70,7 @@ class CommonProblemController extends Controller
     }
 
     public function destroy(CommonProblem $common_problem) {
-      // Gate::authorize('item_type_destroy');
+      Gate::authorize('common_problems.delete');
 
       $common_problem->delete();
       

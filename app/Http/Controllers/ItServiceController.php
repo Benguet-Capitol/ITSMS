@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ItService;
-use App\Http\Resources\ItServiceResource;
 use App\Http\Requests\StoreItServiceRequest;
 use App\Http\Requests\UpdateItServiceRequest;
+use App\Http\Resources\ItServiceResource;
+use App\Models\ItService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ItServiceController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('it_service_index');
+      Gate::authorize('it_services.view');
 
       $query = ItService::query();
 
@@ -49,7 +50,7 @@ class ItServiceController extends Controller
     }
 
     public function store(StoreItServiceRequest $request) {
-      // Gate::authorize('it_service_store');
+      Gate::authorize('it_services.create');
       
       $data = $request->validated();
 
@@ -59,7 +60,7 @@ class ItServiceController extends Controller
     }
 
     public function update(UpdateItServiceRequest $request, ItService $itService) {
-      // Gate::authorize('it_service_update');
+      Gate::authorize('it_services.update');
 
       $data = $request->validated();
 
@@ -69,7 +70,7 @@ class ItServiceController extends Controller
     }
 
     public function destroy(ItService $itService) {
-      // Gate::authorize('it_service_destroy');
+      Gate::authorize('it_services.delete');
 
       $itService->delete();
       
@@ -77,10 +78,12 @@ class ItServiceController extends Controller
     }
 
     public function select() {
-        $itServices = ItService::all();
+      Gate::authorize('it_services.view');
+      
+      $itServices = ItService::all();
 
-        return response()->json([
-          'data' => ItServiceResource::collection($itServices)
-        ]);
+      return response()->json([
+        'data' => ItServiceResource::collection($itServices)
+      ]);
     }
 }

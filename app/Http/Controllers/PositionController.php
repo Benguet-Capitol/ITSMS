@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Gate;
 class PositionController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('position_index');
+      Gate::authorize('positions.view');
 
       $query = Position::query();
 
@@ -46,7 +46,7 @@ class PositionController extends Controller
     }
 
     public function store(StorePositionRequest $request) {
-      // Gate::authorize('department_store');
+      Gate::authorize('positions.create');
       
       $data = $request->validated();
 
@@ -56,7 +56,7 @@ class PositionController extends Controller
     }
 
     public function update(UpdatePositionRequest $request, Position $position) {
-      // Gate::authorize('department_update');
+      Gate::authorize('positions.update');
 
       $data = $request->validated();
 
@@ -66,7 +66,7 @@ class PositionController extends Controller
     }
 
     public function destroy(Position $position) {
-      // Gate::authorize('department_destroy');
+      Gate::authorize('positions.delete');
 
       $position->delete();
       
@@ -74,10 +74,12 @@ class PositionController extends Controller
     }
 
     public function select() {
-        $positions = Position::all();
+      Gate::authorize('positions.view');
+      
+      $positions = Position::all();
 
-        return response()->json([
-          'data' => PositionResource::collection($positions)
-        ]);
+      return response()->json([
+        'data' => PositionResource::collection($positions)
+      ]);
     }
 }

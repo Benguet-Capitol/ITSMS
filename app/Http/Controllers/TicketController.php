@@ -16,11 +16,12 @@ use App\Services\ProfileEngagementService;
 use Barryvdh\DomPDF\Facade\Pdf; 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class TicketController extends Controller
 {
     public function index(Request $request, HrisClientService $hris) {
-      // Gate::authorize('it_service_index');
+      Gate::authorize('tickets.view');
 
       $profileId = Auth::user()->profile->id;
       $baseQuery = Ticket::query();
@@ -118,7 +119,7 @@ class TicketController extends Controller
     }
 
     public function store(StoreTicketRequest $request) {
-      // Gate::authorize('it_service_store');
+      Gate::authorize('tickets.create');
       
       $data = $request->validated();
 
@@ -130,7 +131,7 @@ class TicketController extends Controller
     }
 
     public function update(UpdateTicketRequest $request, Ticket $ticket) {
-      // Gate::authorize('it_service_update');
+      Gate::authorize('tickets.update');
 
       $data = $request->validated();
 
@@ -140,7 +141,7 @@ class TicketController extends Controller
     }
 
     public function destroy(Ticket $ticket) {
-      // Gate::authorize('it_service_destroy');
+      Gate::authorize('tickets.delete');
 
       $ticket->delete();
       
@@ -148,6 +149,7 @@ class TicketController extends Controller
     }
 
     public function accept(Request $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $profile = Auth::user()->profile;
 
         if (!$profile) {
@@ -173,6 +175,7 @@ class TicketController extends Controller
     }
 
     public function checkStock(Request $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $ticket->update([
           'query_status' => TicketStatus::CheckingStock,
       ]);
@@ -183,6 +186,7 @@ class TicketController extends Controller
     }
 
     public function awaitPart(Request $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $ticket->update([
           'query_status' => TicketStatus::AwaitingPart,
       ]);
@@ -193,6 +197,7 @@ class TicketController extends Controller
     }
 
     public function resolve(ResolveTicketRequest $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $data = $request->validated();
 
       $data['query_status'] = TicketStatus::Resolved;
@@ -206,6 +211,7 @@ class TicketController extends Controller
     }
 
     public function cancel(Request $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $ticket->update([
           'query_status' => TicketStatus::Cancelled,
           'request_status' => TicketStatus::Closed,
@@ -217,6 +223,7 @@ class TicketController extends Controller
     }
 
     public function reopen(Request $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $ticket->assessment()->delete();
 
       $ticket->update([
@@ -230,6 +237,7 @@ class TicketController extends Controller
     }
 
     public function assess(AssessTicketRequest $request, Ticket $ticket, HrisClientService $hris) {
+        Gate::authorize('tickets.update');
         $data = $request->validated();
 
         // Resolve assessed_by — match by employee_id/employee_id_number, fallback to auth user name
@@ -268,6 +276,7 @@ class TicketController extends Controller
     }
 
     public function setServiceMethod(SetTicketServiceMethodRequest $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $data = $request->validated();
 
       $ticket->update($data);
@@ -276,6 +285,7 @@ class TicketController extends Controller
     }
 
     public function setReleaseDate(SetTicketReleaseDateRequest $request, Ticket $ticket) {
+      Gate::authorize('tickets.update');
       $data = $request->validated();
 
       $ticket->update($data);
@@ -284,6 +294,7 @@ class TicketController extends Controller
     }
 
     public function assessmentReport(Ticket $ticket, HrisClientService $hris) {
+        Gate::authorize('tickets.view');
         $ticket->load([
             'assessment',
             'inventory',

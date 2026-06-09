@@ -7,12 +7,12 @@ use App\Models\ItemType;
 use App\Http\Resources\ItemTypeResource;
 use App\Http\Requests\StoreItemTypeRequest;
 use App\Http\Requests\UpdateItemTypeRequest;
-use Illuminate\Auth\Access\Gate;
+use Illuminate\Support\Facades\Gate;
 
 class ItemTypeController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('item_type_index');
+      Gate::authorize('item_types.view');
 
       $query = ItemType::query();
 
@@ -48,7 +48,7 @@ class ItemTypeController extends Controller
     }
 
     public function store(StoreItemTypeRequest $request) {
-      // Gate::authorize('item_type_store');
+      Gate::authorize('item_types.create');
       
       $data = $request->validated();
 
@@ -58,7 +58,7 @@ class ItemTypeController extends Controller
     }
 
     public function update(UpdateItemTypeRequest $request, ItemType $item_type) {
-      // Gate::authorize('item_type_update');
+      Gate::authorize('item_types.update');
 
       $data = $request->validated();
 
@@ -68,7 +68,7 @@ class ItemTypeController extends Controller
     }
 
     public function destroy(ItemType $item_type) {
-      // Gate::authorize('item_type_destroy');
+      Gate::authorize('item_types.delete');
 
       $item_type->delete();
       
@@ -76,11 +76,13 @@ class ItemTypeController extends Controller
     }
 
     public function select() {
-        $item_types = ItemType::all();
+      Gate::authorize('item_types.view');
+      
+      $item_types = ItemType::all();
 
-        return response()->json([
-          'data' => ItemTypeResource::collection($item_types)
-        ]);
+      return response()->json([
+        'data' => ItemTypeResource::collection($item_types)
+      ]);
     }
 
 // id	name	is_main_asset	is_component

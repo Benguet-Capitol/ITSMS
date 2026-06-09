@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\MeasurementUnit;
-use Illuminate\Http\Request;
-use App\Http\Resources\MeasurementUnitResource;
 use App\Http\Requests\StoreMeasurementUnitRequest;
 use App\Http\Requests\UpdateMeasurementUnitRequest;
+use App\Http\Resources\MeasurementUnitResource;
+use App\Models\MeasurementUnit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class MeasurementUnitController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('item_type_index');
+      Gate::authorize('measurement_units.view');
 
       $query = MeasurementUnit::query();
 
@@ -45,7 +46,7 @@ class MeasurementUnitController extends Controller
     }
 
     public function store(StoreMeasurementUnitRequest $request) {
-      // Gate::authorize('item_store');
+      Gate::authorize('measurement_units.create');
       
       $data = $request->validated();
 
@@ -55,7 +56,7 @@ class MeasurementUnitController extends Controller
     }
 
     public function update(UpdateMeasurementUnitRequest $request, MeasurementUnit $measurementUnit) {
-      // Gate::authorize('item_update');
+      Gate::authorize('measurement_units.update');
 
       $data = $request->validated();
 
@@ -65,7 +66,7 @@ class MeasurementUnitController extends Controller
     }
 
     public function destroy(MeasurementUnit $measurementUnit) {
-      // Gate::authorize('item_destroy');
+      Gate::authorize('measurement_units.delete');
 
       $measurementUnit->delete();
       
@@ -73,10 +74,12 @@ class MeasurementUnitController extends Controller
     }
 
     public function select() {
-        $measurementUnits = MeasurementUnit::all();
+      Gate::authorize('measurement_units.view');
+      
+      $measurementUnits = MeasurementUnit::all();
 
-        return response()->json([
-          'data' => MeasurementUnitResource::collection($measurementUnits)
-        ]);
+      return response()->json([
+        'data' => MeasurementUnitResource::collection($measurementUnits)
+      ]);
     }
 }

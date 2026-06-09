@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Role;
-use Illuminate\Http\Request;
-use App\Http\Resources\RoleResource;
 use App\Http\Requests\StoreRoleRequest;
 use App\Http\Requests\UpdateRoleRequest;
+use App\Http\Resources\RoleResource;
+use App\Models\Role;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class RoleController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('permission_index');
+      Gate::authorize('roles.view');
 
       $query = Role::query();
 
@@ -43,7 +44,7 @@ class RoleController extends Controller
     }
 
     public function store(StoreRoleRequest $request) {
-      // Gate::authorize('permission_store');
+      Gate::authorize('roles.create');
       
       $data = $request->validated();
 
@@ -54,7 +55,7 @@ class RoleController extends Controller
     }
 
     public function update(UpdateRoleRequest $request, Role $role) {
-      // Gate::authorize('permission_update');
+      Gate::authorize('roles.update');
 
       $data = $request->validated();
 
@@ -73,7 +74,7 @@ class RoleController extends Controller
     }
 
     public function destroy(Role $role) {
-      // Gate::authorize('permission_destroy');
+      Gate::authorize('roles.delete');
 
       $role->delete();
       
@@ -81,6 +82,7 @@ class RoleController extends Controller
     }
 
     public function select() {
+        Gate::authorize('roles.view');
         // ?? Member no active membership
         $roles = Role::all();
         // $members = Member::with('memberships')->whereDoesntHave('memberships', function ($query) {

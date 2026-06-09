@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\BrandModel;
-use App\Http\Resources\BrandModelResource;
 use App\Http\Requests\StoreBrandModelRequest;
 use App\Http\Requests\UpdateBrandModelRequest;
+use App\Http\Resources\BrandModelResource;
+use App\Models\BrandModel;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class BrandModelController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('brand_model_index');
+      Gate::authorize('brand_models.view');
 
       $query = BrandModel::query();
 
@@ -44,7 +45,7 @@ class BrandModelController extends Controller
     }
 
     public function store(StoreBrandModelRequest $request) {
-      // Gate::authorize('brand_store');
+      Gate::authorize('brand_models.create');
       
       $data = $request->validated();
 
@@ -54,7 +55,7 @@ class BrandModelController extends Controller
     }
 
     public function update(UpdateBrandModelRequest $request, BrandModel $brand_model) {
-      // Gate::authorize('brand_update');
+      Gate::authorize('brand_models.update');
 
       $data = $request->validated();
 
@@ -64,7 +65,7 @@ class BrandModelController extends Controller
     }
 
     public function destroy(BrandModel $brand_model) {
-      // Gate::authorize('brand_destroy');
+      Gate::authorize('brand_models.delete');
 
       $brand_model->delete();
       
@@ -91,10 +92,12 @@ class BrandModelController extends Controller
     // }
 
     public function search(Request $request) {
-      $query = $request->get('q');
-      $item_type_id = $request->get('item_type_id');
-      $limit = (int) $request->get('limit', 20);
-      $page = (int) $request->get('page', 1);
+      Gate::authorize('brand_models.view');
+      
+      $query = $request->input('q');
+      $item_type_id = $request->input('item_type_id');
+      $limit = (int) $request->input('limit', 20);
+      $page = (int) $request->input('page', 1);
       $offset = ($page - 1) * $limit;
 
       // if($item_type_id) {

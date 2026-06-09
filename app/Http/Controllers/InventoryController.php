@@ -9,10 +9,12 @@ use App\Models\InventoryInternalComponent;
 use App\Http\Requests\StoreInventoryRequest;
 use App\Http\Requests\UpdateInventoryRequest;
 use App\Services\HrisClientService;
+use Illuminate\Support\Facades\Gate;
 
 class InventoryController extends Controller
 {
     public function index(Request $request, HrisClientService $hris) {
+        Gate::authorize('inventories.view');
         $search   = trim((string) $request->input('search', ''));
         $tab      = (string) $request->input('tab', 'all');
         $perPage  = (int) $request->input('per_page', 10);
@@ -120,7 +122,7 @@ class InventoryController extends Controller
     }
 
     public function store(StoreInventoryRequest $request) {
-      // Gate::authorize('item_store');
+      Gate::authorize('inventories.create');
       
       $data = $request->validated();
       
@@ -142,7 +144,7 @@ class InventoryController extends Controller
     }
 
     public function update(UpdateInventoryRequest $request, Inventory $inventory) {
-      // Gate::authorize('item_update');
+      Gate::authorize('inventories.update');
 
       $data = $request->validated();
 
@@ -194,7 +196,7 @@ class InventoryController extends Controller
     }
 
     public function destroy(Inventory $inventory) {
-      // Gate::authorize('item_destroy');
+      Gate::authorize('inventories.delete');
 
       $inventory->delete();
       
@@ -202,6 +204,7 @@ class InventoryController extends Controller
     }
 
     public function search(Request $request, HrisClientService $hris) {
+        Gate::authorize('inventories.view');
         $query  = trim((string) $request->input('q', ''));
         $limit  = (int) $request->input('limit', 20);
         $page   = (int) $request->input('page', 1);
@@ -243,31 +246,32 @@ class InventoryController extends Controller
     }
 
     public function searchMainAsset(Request $request) {
-      $query = $request->get('q');
-      $limit = (int) $request->get('limit', 20);
-      $page = (int) $request->get('page', 1);
-      $offset = ($page - 1) * $limit;
+        Gate::authorize('inventories.view');
+        $query = $request->input('q');
+        $limit = (int) $request->input('limit', 20);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $limit;
 
-      $exclude_id = $request->get('exclude_id');
+        $exclude_id = $request->input('exclude_id');
 
-      $inventories = Inventory::query()
-          ->when($query, function ($qBuilder) use ($query) {
-            $qBuilder->where('property_number', 'like', "%$query%")
-                ->whereHas('item_type', function ($q4) {
-                    $q4->where('is_main_inventory', true)
-                        ->where('is_component', false);
-                });
-        })
-        ->when($exclude_id, function ($qBuilder) use ($exclude_id) {
-            $qBuilder->where('id', '!=', $exclude_id);
-        })
-        ->offset($offset)
-        ->limit($limit)
-        ->get();  
+        $inventories = Inventory::query()
+            ->when($query, function ($qBuilder) use ($query) {
+              $qBuilder->where('property_number', 'like', "%$query%")
+                  ->whereHas('item_type', function ($q4) {
+                      $q4->where('is_main_inventory', true)
+                          ->where('is_component', false);
+                  });
+          })
+          ->when($exclude_id, function ($qBuilder) use ($exclude_id) {
+              $qBuilder->where('id', '!=', $exclude_id);
+          })
+          ->offset($offset)
+          ->limit($limit)
+          ->get();  
 
-      return response()->json([
-          'data' => InventoryResource::collection($inventories),
-      ]);
+        return response()->json([
+            'data' => InventoryResource::collection($inventories),
+        ]);
     }
 
     private function injectEmployeeMap(Request $request, $employeeId, HrisClientService $hris): void {

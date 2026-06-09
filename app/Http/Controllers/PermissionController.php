@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Gate;
 class PermissionController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('permission_index');
+      Gate::authorize('permissions.view');
 
       $query = Permission::query();
 
@@ -44,7 +44,7 @@ class PermissionController extends Controller
     }
 
     public function store(StorePermissionRequest $request) {
-      // Gate::authorize('permission_store');
+      Gate::authorize('permissions.create');
       
       $data = $request->validated();
 
@@ -54,7 +54,7 @@ class PermissionController extends Controller
     }
 
     public function update(UpdatePermissionRequest $request, Permission $permission) {
-      // Gate::authorize('permission_update');
+      Gate::authorize('permissions.update');
 
       $data = $request->validated();
 
@@ -64,7 +64,7 @@ class PermissionController extends Controller
     }
 
     public function destroy(Permission $permission) {
-      // Gate::authorize('permission_destroy');
+      Gate::authorize('permissions.delete');
 
       $permission->delete();
       
@@ -72,6 +72,7 @@ class PermissionController extends Controller
     }
 
     public function permissionAll() {
+        Gate::authorize('permissions.view');
         $permissions = Permission::all();
 
         return response()->json([

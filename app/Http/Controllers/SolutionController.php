@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Solution;
-use App\Http\Resources\SolutionResource;
 use App\Http\Requests\StoreSolutionRequest;
 use App\Http\Requests\UpdateSolutionRequest;
+use App\Http\Resources\SolutionResource;
+use App\Models\Solution;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class SolutionController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('it_service_index');
+      Gate::authorize('solutions.view');
 
       $query = Solution::query();
 
@@ -49,6 +50,8 @@ class SolutionController extends Controller
     }
 
     public function store(StoreSolutionRequest $request) {
+      Gate::authorize('solutions.create');
+      
       $data = $request->validated();
 
       $solution = Solution::create($data);
@@ -57,7 +60,7 @@ class SolutionController extends Controller
     }
 
     public function update(UpdateSolutionRequest $request, Solution $solution) {
-      // Gate::authorize('it_service_update');
+      Gate::authorize('solutions.update');
 
       $data = $request->validated();
 
@@ -67,7 +70,7 @@ class SolutionController extends Controller
     }
 
     public function destroy(Solution $solution) {
-      // Gate::authorize('item_destroy');
+      Gate::authorize('solutions.delete');
 
       $solution->delete();
       
@@ -75,10 +78,12 @@ class SolutionController extends Controller
     }
 
     public function select() {
-        $solutions = Solution::latest()->get();
+      Gate::authorize('solutions.view');
+      
+      $solutions = Solution::latest()->get();
 
-        return response()->json([
-          'data' => SolutionResource::collection($solutions)
-        ]);
+      return response()->json([
+        'data' => SolutionResource::collection($solutions)
+      ]);
     }
 }

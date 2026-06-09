@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Gate;
 class DepartmentController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('department_index');
+      Gate::authorize('departments.view');
 
       $query = Department::query();
 
@@ -47,7 +47,7 @@ class DepartmentController extends Controller
     }
 
     public function store(StoreDepartmentRequest $request) {
-      // Gate::authorize('department_store');
+      Gate::authorize('departments.create');
       
       $data = $request->validated();
 
@@ -57,7 +57,7 @@ class DepartmentController extends Controller
     }
 
     public function update(UpdateDepartmentRequest $request, Department $department) {
-      // Gate::authorize('department_update');
+      Gate::authorize('departments.update');
 
       $data = $request->validated();
 
@@ -67,7 +67,7 @@ class DepartmentController extends Controller
     }
 
     public function destroy(Department $department) {
-      // Gate::authorize('department_destroy');
+      Gate::authorize('departments.delete');
 
       $department->delete();
       
@@ -75,11 +75,13 @@ class DepartmentController extends Controller
     }
 
     public function select() {
-        $departments = Department::all();
+      Gate::authorize('departments.view');
+      
+      $departments = Department::all();
 
-        return response()->json([
-          'data' => DepartmentResource::collection($departments)
-        ]);
+      return response()->json([
+        'data' => DepartmentResource::collection($departments)
+      ]);
     }
 
 }

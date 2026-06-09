@@ -7,11 +7,12 @@ use Illuminate\Http\Request;
 use App\Http\Resources\AgencyResource;
 use App\Http\Requests\StoreAgencyRequest;
 use App\Http\Requests\UpdateAgencyRequest;
+use Illuminate\Support\Facades\Gate;
 
 class AgencyController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('agency_index');
+      Gate::authorize('agencies.view');
 
       $query = Agency::query();
 
@@ -43,7 +44,7 @@ class AgencyController extends Controller
     }
 
     public function store(StoreAgencyRequest $request) {
-      // Gate::authorize('agency_store');
+      Gate::authorize('agencies.create');
       
       $data = $request->validated();
 
@@ -53,7 +54,7 @@ class AgencyController extends Controller
     }
 
     public function update(UpdateAgencyRequest $request, Agency $agency) {
-      // Gate::authorize('agency_update');
+      Gate::authorize('agencies.update');
 
       $data = $request->validated();
 
@@ -63,7 +64,7 @@ class AgencyController extends Controller
     }
 
     public function destroy(Agency $agency) {
-      // Gate::authorize('agency_destroy');
+      Gate::authorize('agencies.delete');
 
       $agency->delete();
       
@@ -71,17 +72,21 @@ class AgencyController extends Controller
     }
 
     public function select() {
-        $agencies = Agency::all();
+      Gate::authorize('agencies.view');
+      
+      $agencies = Agency::all();
 
-        return response()->json([
-          'data' => AgencyResource::collection($agencies)
-        ]);
+      return response()->json([
+        'data' => AgencyResource::collection($agencies)
+      ]);
     }
 
     public function search(Request $request) {
-      $query = $request->get('q');
-      $limit = (int) $request->get('limit', 20);
-      $page = (int) $request->get('page', 1);
+      Gate::authorize('agencies.view');
+      
+      $query = $request->input('q');
+      $limit = (int) $request->input('limit', 20);
+      $page = (int) $request->input('page', 1);
       $offset = ($page - 1) * $limit;
 
       $agencies = Agency::query()

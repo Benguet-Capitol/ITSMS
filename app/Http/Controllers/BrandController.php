@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Brand;
 use App\Http\Resources\BrandResource;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreBrandRequest;
 use App\Http\Requests\UpdateBrandRequest;
@@ -11,7 +12,7 @@ use App\Http\Requests\UpdateBrandRequest;
 class BrandController extends Controller
 {
     public function index(Request $request) {
-      // Gate::authorize('brand_index');
+      Gate::authorize('brands.view');
 
       $query = Brand::query();
 
@@ -43,7 +44,7 @@ class BrandController extends Controller
     }
 
     public function store(StoreBrandRequest $request) {
-      // Gate::authorize('brand_store');
+      Gate::authorize('brands.create');
       
       $data = $request->validated();
 
@@ -53,7 +54,7 @@ class BrandController extends Controller
     }
 
     public function update(UpdateBrandRequest $request, Brand $brand) {
-      // Gate::authorize('brand_update');
+      Gate::authorize('brands.update');
 
       $data = $request->validated();
 
@@ -63,7 +64,7 @@ class BrandController extends Controller
     }
 
     public function destroy(Brand $brand) {
-      // Gate::authorize('brand_destroy');
+      Gate::authorize('brands.delete');
 
       $brand->delete();
       
@@ -71,10 +72,12 @@ class BrandController extends Controller
     }
 
     public function select() {
-        $brands = Brand::all();
+      Gate::authorize('brands.view');
+      
+      $brands = Brand::all();
 
-        return response()->json([
-          'data' => BrandResource::collection($brands)
-        ]);
+      return response()->json([
+        'data' => BrandResource::collection($brands)
+      ]);
     }
 }
