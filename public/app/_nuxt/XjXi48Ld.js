@@ -1,0 +1,1 @@
+import{aR as i,E as a,as as t}from"./Dphkrzls.js";const o=i(e=>{if(!e.meta.permission)return;const s=a(),r=e.meta.permission;if(s.value?.permissions?.[r]!==!0)return t("/unauthorized",{replace:!0})});export{o as default};
