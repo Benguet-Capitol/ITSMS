@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <meta charset="utf-8">
-    <title>Inventory Report</title>
+    <title>Inventory Report as of {{ $generatedAt->format('F Y') }}</title>
     <style>
         @page {
             margin: 18px 22px;
@@ -132,7 +132,7 @@
 
     <table class="meta-table">
         <tr>
-            <td class="meta-label">Generated At</td>
+            <td class="meta-label">Generated as of</td>
             <td>{{ $generatedAt->format('Y-m-d h:i A') }}</td>
             <td class="meta-label">Total Records</td>
             <td>{{ count($rows) }}</td>
