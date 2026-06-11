@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <meta charset="utf-8">
-    <title>Inventory Report as of {{ $generatedAt->format('F Y') }}</title>
+    <title>Inventory Report</title>
     <style>
         @page {
             margin: 18px 22px;
@@ -127,7 +127,7 @@
     </style>
 </head>
 <body>
-    <div class="title">Inventory Report</div>
+    <div class="title">Inventory Report as of {{ $generatedAt->format('F Y') }}</div>
     <div class="subtitle">Generated inventory listing based on selected filters</div>
 
     <table class="meta-table">
