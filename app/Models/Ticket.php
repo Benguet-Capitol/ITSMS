@@ -10,7 +10,7 @@ use App\Models\Solution;
 
 class Ticket extends Model
 {
-    protected $with = ['profile', 'employee', 'inventory', 'itService', 'personnel', 'item_type', 'solution', 'agency'];
+    protected $with = ['profile', 'employee', 'inventory.parent_component', 'itService', 'personnel', 'item_type', 'solution', 'agency'];
 
     protected $fillable = [
         'profile_id',

@@ -79,19 +79,35 @@
             text-align: center;
         }
 
-        .no-col { width: 4%; }
-        .property-col { width: 11%; }
-        .employee-col { width: 14%; }
-        .division-col { width: 13%; }
-        .office-col { width: 11%; }
-        .item-type-col { width: 10%; }
-        .brand-col { width: 16%; }
-        .components-col { width: 21%; }
+        .no-col          { width: 4%; }
+        .property-col    { width: 11%; }
+        .employee-col    { width: 14%; }
+        .division-col    { width: 13%; }
+        .office-col      { width: 11%; }
+        .item-type-col   { width: 10%; }
+        .brand-col       { width: 16%; }
+        .components-col  { width: 21%; }
 
         .no-records td {
             text-align: center;
             padding: 12px;
             font-style: italic;
+        }
+
+        .obsolete-row td {
+            background-color: #fff3cd;
+        }
+
+        .obsolete-badge {
+            display: inline-block;
+            font-size: 7px;
+            font-weight: bold;
+            background-color: #e65c00;
+            color: #ffffff;
+            padding: 1px 4px;
+            border-radius: 3px;
+            letter-spacing: 0.3px;
+            margin-top: 3px;
         }
 
         .summary-title {
@@ -116,6 +132,22 @@
         .summary-table th {
             background: #f2f2f2;
             text-align: left;
+        }
+
+        .legend {
+            margin-top: 10px;
+            font-size: 8px;
+            color: #444;
+        }
+
+        .legend-swatch {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #fff3cd;
+            border: 1px solid #c8a000;
+            margin-right: 4px;
+            vertical-align: middle;
         }
 
         .footer-note {
@@ -149,6 +181,14 @@
             <td class="meta-label">Status</td>
             <td>{{ $filters['status'] ?: 'All' }}</td>
         </tr>
+        <tr>
+            <td class="meta-label">Obsolete Items</td>
+            <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
+                {{ $obsoleteCount }} item{{ $obsoleteCount !== 1 ? 's' : '' }}
+                ({{ count($rows) > 0 ? round(($obsoleteCount / count($rows)) * 100, 1) : 0 }}% of total)
+            </td>
+            <td colspan="2"></td>
+        </tr>
     </table>
 
     <table class="report-table">
@@ -166,12 +206,17 @@
         </thead>
         <tbody>
             @forelse ($rows as $index => $row)
-                <tr>
+                <tr class="{{ $row['is_obsolete'] ? 'obsolete-row' : '' }}">
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $row['division_section'] ?: '—' }}</td>
                     <td>{{ $row['employee_name'] ?: '—' }}</td>
                     <td>{{ $row['property_number'] ?: '—' }}</td>
-                    <td>{{ $row['date_acquired'] ?: '—' }}</td>
+                    <td>
+                        {{ $row['date_acquired'] ?: '—' }}
+                        @if ($row['is_obsolete'])
+                            <br><span class="obsolete-badge">OBSOLETE</span>
+                        @endif
+                    </td>
                     <td>{{ $row['item_type'] ?: '—' }}</td>
                     <td>{{ $row['brand_model'] ?: '—' }}</td>
                     <td style="white-space: pre-line;">{{ $row['child_components'] ?: '—' }}</td>
@@ -183,6 +228,11 @@
             @endforelse
         </tbody>
     </table>
+
+    <div class="legend">
+        <span class="legend-swatch"></span>
+        Highlighted rows indicate items with a date acquired of more than <strong>5 years</strong> ago and are considered <strong>obsolete</strong>.
+    </div>
 
     <div class="summary-title">Item Type Summary</div>
 
@@ -204,6 +254,17 @@
                     <td colspan="2">No summary available.</td>
                 </tr>
             @endforelse
+
+            @if (count($rows) > 0)
+                <tr style="border-top: 2px solid #bfbfbf;">
+                    <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
+                        &#9654; Obsolete Items (&gt;5 yrs)
+                    </td>
+                    <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
+                        {{ $obsoleteCount }}
+                    </td>
+                </tr>
+            @endif
         </tbody>
     </table>
 

@@ -30,7 +30,7 @@ class TicketResource extends JsonResource
         $agency = $this->whenLoaded('agency');
 
         $employeeMap = $request->attributes->get('employeeMap');
-        $inventoryEmployee = $employeeMap?->get((int) $inventory?->employee_id);
+        $inventoryEmployee = $employeeMap?->get((int) $inventory?->employee_id) ?? $employeeMap?->get((int) $inventory?->parent_component?->employee_id);
 
         $officeId =
             data_get($inventoryEmployee, 'office_id') ??
@@ -64,7 +64,6 @@ class TicketResource extends JsonResource
           'personnel_agency_assigned' => ProfileResource::collection($agency?->assigned_profiles ?? collect()),
           'personnel_office_assigned' => ProfileResource::collection($personnelOfficeAssigned),
 
-          // core ticket fields
           'ticket_number' => $this->ticket_number,
           'concern' => $this->concern,
           'query_status' => $this->query_status,

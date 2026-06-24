@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Enums\TicketStatus;
 use App\Enums\ServiceMethod;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 class StoreTicketRequest extends FormRequest
 {
@@ -43,6 +44,33 @@ class StoreTicketRequest extends FormRequest
             'is_other_agency' => 'boolean',
             'full_name' => 'nullable|string',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $inventoryId = $this->input('inventory_id');
+
+            // Only check if an inventory is attached (other agency tickets won't have one)
+            if (!$inventoryId) return;
+
+            $closedStatuses = [
+                TicketStatus::Resolved,
+                TicketStatus::Assessed,
+                TicketStatus::Cancelled,
+            ];
+
+            $hasOpenTicket = \App\Models\Ticket::where('inventory_id', $inventoryId)
+                ->whereNotIn('query_status', $closedStatuses)
+                ->exists();
+
+            if ($hasOpenTicket) {
+                $validator->errors()->add(
+                    'inventory',
+                    'This inventory item already has an open ticket. Please close it before creating a new one.'
+                );
+            }
+        });
     }
 
     public function messages(): array {

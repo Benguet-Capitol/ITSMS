@@ -98,6 +98,8 @@ class InventoryReportController extends Controller
       try {
           $rows = $this->getReportRows($request, $hris);
 
+          $obsoleteCount = $rows->filter(fn ($row) => $row['is_obsolete'])->count(); 
+
           $employees = collect($hris->getEmployeesCached());
           $itemType = ItemType::find($request->input('item_type'));
           $employee = $employees->firstWhere('id', (int) $request->input('employee'));
@@ -137,6 +139,7 @@ class InventoryReportController extends Controller
               'rows' => $rows,
               'filters' => $filters,
               'generatedAt' => now(),
+              'obsoleteCount' => $obsoleteCount,
               'summary' => $summary,
           ])->setPaper($customPaper, 'landscape');
 
@@ -243,9 +246,9 @@ class InventoryReportController extends Controller
         }
 
         return $query
-            ->orderBy('property_number')
-            ->get()
-            ->map(function ($inventory) use ($employeeMap) {
+          ->orderBy('property_number')
+          ->get()
+          ->map(function ($inventory) use ($employeeMap) {
               $employee = $employeeMap->get((int) $inventory->employee_id);
 
               $employeeName =
@@ -290,10 +293,16 @@ class InventoryReportController extends Controller
                   ->values()
                   ->implode("\n");
 
+              // ── Obsolete check (raw value, before formatting) ──────────────────
+              $isObsolete = $inventory->date_acquired
+                  ? Carbon::parse($inventory->date_acquired)->lt(now()->subYears(5))
+                  : false;
+              // ───────────────────────────────────────────────────────────────────
+
               return [
-                  'property_number' => $this->cleanPdfText($inventory->property_number),
-                  'employee_name' => $this->cleanPdfText($employeeName),
-                  'office' => $this->cleanPdfText($office),
+                  'property_number'  => $this->cleanPdfText($inventory->property_number),
+                  'employee_name'    => $this->cleanPdfText($employeeName),
+                  'office'           => $this->cleanPdfText($office),
                   'division_section' => $this->cleanPdfText(
                       data_get($employee, 'division_section')
                       ?: data_get($employee, 'division')
@@ -301,16 +310,17 @@ class InventoryReportController extends Controller
                       ?: data_get($employee, 'division_desc')
                       ?: data_get($employee, 'section_desc')
                   ),
-                  'item_type' => $this->cleanPdfText($inventory->item_type?->type),
-                  'brand_model' => $this->cleanPdfText($brandModelDisplay),
+                  'item_type'        => $this->cleanPdfText($inventory->item_type?->type),
+                  'brand_model'      => $this->cleanPdfText($brandModelDisplay),
                   'child_components' => $this->cleanPdfText($childComponentsDisplay),
-                  'serial_number' => $this->cleanPdfText($inventory->serial_number),
-                  'status' => $this->cleanPdfText($inventory->status),
-                  'date_acquired' => $this->cleanPdfText(
+                  'serial_number'    => $this->cleanPdfText($inventory->serial_number),
+                  'status'           => $this->cleanPdfText($inventory->status),
+                  'date_acquired'    => $this->cleanPdfText(
                       $inventory->date_acquired
                           ? Carbon::parse($inventory->date_acquired)->format('F d, Y')
                           : ''
                   ),
+                  'is_obsolete'      => $isObsolete,  // ← new
               ];
           });
     }
