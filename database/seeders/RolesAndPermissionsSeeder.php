@@ -106,6 +106,12 @@ class RolesAndPermissionsSeeder extends Seeder
             // 'common_problems.update',
             // 'common_problems.delete',
 
+            'requests.other_it_services.view',
+            'requests.other_it_services.create',
+            'requests.other_it_services.update',
+            'requests.other_it_services.print',
+            'requests.other_it_services.delete',
+
             // HRIS Proxies (read-only)
             'employees.view',
             'offices.view',
@@ -207,6 +213,12 @@ class RolesAndPermissionsSeeder extends Seeder
                 // 'common_problems.update',
                 // 'common_problems.delete',
 
+                'requests.other_it_services.view',
+                'requests.other_it_services.create',
+                'requests.other_it_services.update',
+                'requests.other_it_services.print',
+                'requests.other_it_services.delete',
+
                 'employees.view',
                 'offices.view',
             ],
@@ -248,6 +260,12 @@ class RolesAndPermissionsSeeder extends Seeder
                 'it_services.view',
                 'measurement_units.view',
                 // 'common_problems.view',
+
+                'requests.other_it_services.view',
+                'requests.other_it_services.create',
+                'requests.other_it_services.update',
+                'requests.other_it_services.print',
+                'requests.other_it_services.delete',
 
                 'employees.view',
                 'offices.view',
