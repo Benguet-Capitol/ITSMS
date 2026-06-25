@@ -293,9 +293,15 @@ class InventoryReportController extends Controller
                   ->values()
                   ->implode("\n");
 
+              $rawDateAcquired = $inventory->date_acquired;
+                  
+              if (! $rawDateAcquired && $inventory->parent_component_id) {
+                  $rawDateAcquired = $inventory->parent_component?->date_acquired;
+              }
+              
               // ── Obsolete check (raw value, before formatting) ──────────────────
-              $isObsolete = $inventory->date_acquired
-                  ? Carbon::parse($inventory->date_acquired)->lt(now()->subYears(5))
+              $isObsolete = $rawDateAcquired
+                  ? Carbon::parse($rawDateAcquired)->lt(now()->subYears(5))
                   : false;
               // ───────────────────────────────────────────────────────────────────
 
@@ -315,12 +321,12 @@ class InventoryReportController extends Controller
                   'child_components' => $this->cleanPdfText($childComponentsDisplay),
                   'serial_number'    => $this->cleanPdfText($inventory->serial_number),
                   'status'           => $this->cleanPdfText($inventory->status),
-                  'date_acquired'    => $this->cleanPdfText(
-                      $inventory->date_acquired
-                          ? Carbon::parse($inventory->date_acquired)->format('F d, Y')
+                  'date_acquired' => $this->cleanPdfText(
+                      $rawDateAcquired
+                          ? Carbon::parse($rawDateAcquired)->format('F d, Y')
                           : ''
                   ),
-                  'is_obsolete'      => $isObsolete,  // ← new
+                  'is_obsolete'      => $isObsolete,
               ];
           });
     }
