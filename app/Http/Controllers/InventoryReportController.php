@@ -93,104 +93,107 @@ class InventoryReportController extends Controller
     }
 
     public function exportPdf(Request $request, HrisClientService $hris) {
-      Gate::authorize('inventories.report');
-      
-      try {
-          $rows = $this->getReportRows($request, $hris);
+        Gate::authorize('inventories.report');
 
-          $obsoleteCount = $rows->filter(fn ($row) => $row['is_obsolete'])->count(); 
+        try {
+            ini_set('memory_limit', '512M');
+            set_time_limit(120);
 
-          $employees = collect($hris->getEmployeesCached());
-          $itemType = ItemType::find($request->input('item_type'));
-          $employee = $employees->firstWhere('id', (int) $request->input('employee'));
+            $rows = $this->getReportRows($request, $hris);
 
-          $officeDesc = null;
-          $officeCode = null;
+            $obsoleteCount = $rows->filter(fn ($row) => $row['is_obsolete'])->count();
 
-          if ($request->filled('office')) {
-              $officeId = (string) $request->input('office');
+            $employees = collect($hris->getEmployeesCached());
+            $itemType = ItemType::find($request->input('item_type'));
+            $employee = $employees->firstWhere('id', (int) $request->input('employee'));
 
-              $matchedEmployee = $employees
-                  ->first(function ($employee) use ($officeId) {
-                      return (string) data_get($employee, 'office_id') === $officeId;
-                  });
+            $officeDesc = null;
+            $officeCode = null;
 
-              $officeDesc = data_get($matchedEmployee, 'office_desc');
-              $officeCode = data_get($matchedEmployee, 'office_code');
-          }
+            if ($request->filled('office')) {
+                $officeId = (string) $request->input('office');
 
-          $filters = [
-              'item_type' => $itemType?->type ?? 'All',
-              'employee' => data_get($employee, 'fullname')
-                  ?: data_get($employee, 'full_name')
-                  ?: 'All',
-              'office' => $officeDesc ?: 'All',
-              'status' => $this->cleanPdfText($request->input('status')) ?: 'All',
-          ];
+                $matchedEmployee = $employees->first(function ($employee) use ($officeId) {
+                    return (string) data_get($employee, 'office_id') === $officeId;
+                });
 
-          $summary = collect($rows)
-              ->groupBy('item_type')
-              ->map(fn ($items) => count($items))
-              ->sortKeys();
+                $officeDesc = data_get($matchedEmployee, 'office_desc');
+                $officeCode = data_get($matchedEmployee, 'office_code');
+            }
 
-          $customPaper = [0, 0, 576, 936];
+            $filters = [
+                'item_type' => $itemType?->type ?? 'All',
+                'employee' => data_get($employee, 'fullname')
+                    ?: data_get($employee, 'full_name')
+                    ?: 'All',
+                'office' => $officeDesc ?: 'All',
+                'status' => $this->cleanPdfText($request->input('status')) ?: 'All',
+            ];
 
-          $pdf = Pdf::loadView('reports.inventory-report', [
-              'rows' => $rows,
-              'filters' => $filters,
-              'generatedAt' => now(),
-              'obsoleteCount' => $obsoleteCount,
-              'summary' => $summary,
-          ])->setPaper($customPaper, 'landscape');
+            $summary = collect($rows)
+                ->groupBy('item_type')
+                ->map(fn ($items) => count($items))
+                ->sortKeys();
 
-          while (ob_get_level() > 0) {
-              ob_end_clean();
-          }
+            $customPaper = [0, 0, 576, 936];
 
-          $filenameParts = ['Inventory-Report'];
+            $pdf = Pdf::loadView('reports.inventory-report', [
+                'rows' => $rows,
+                'filters' => $filters,
+                'generatedAt' => now(),
+                'obsoleteCount' => $obsoleteCount,
+                'summary' => $summary,
+            ])->setPaper($customPaper, 'landscape');
 
-          if (!empty($officeCode)) {
-              $filenameParts[] = $officeCode;
-          }
+            $filenameParts = ['Inventory-Report'];
 
-          if (!empty($filters['employee']) && $filters['employee'] !== 'All') {
-              $filenameParts[] = $filters['employee'];
-          }
+            if (!empty($officeCode)) {
+                $filenameParts[] = $officeCode;
+            }
 
-          if (!empty($filters['item_type']) && $filters['item_type'] !== 'All') {
-              $filenameParts[] = $filters['item_type'];
-          }
+            if (!empty($filters['employee']) && $filters['employee'] !== 'All') {
+                $filenameParts[] = $filters['employee'];
+            }
 
-          if (!empty($filters['status']) && $filters['status'] !== 'All') {
-              $filenameParts[] = $filters['status'];
-          }
+            if (!empty($filters['item_type']) && $filters['item_type'] !== 'All') {
+                $filenameParts[] = $filters['item_type'];
+            }
 
-          $filenameParts[] = now()->format('Y-m-d_Hi');
+            if (!empty($filters['status']) && $filters['status'] !== 'All') {
+                $filenameParts[] = $filters['status'];
+            }
 
-          $filename = implode('_', array_map(
-              fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
-              $filenameParts
-          )) . '.pdf';
+            $filenameParts[] = now()->format('Y-m-d_Hi');
 
-          while (ob_get_level() > 0) {
-              ob_end_clean();
-          }
+            $filename = implode('_', array_map(
+                fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
+                $filenameParts
+            )) . '.pdf';
 
-          return $pdf->download($filename);
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
 
-      } catch (\Throwable $e) {
-          Log::error('Inventory PDF export failed', [
-              'message' => $e->getMessage(),
-              'line' => $e->getLine(),
-              'file' => $e->getFile(),
-              'trace' => $e->getTraceAsString(),
-          ]);
+            $pdfOutput = $pdf->output();
 
-          return response()->json([
-              'message' => 'Failed to generate PDF report.',
-              'error' => $e->getMessage(),
-          ], 500);
-      }
+            return response($pdfOutput, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Length' => strlen($pdfOutput),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Inventory PDF export failed', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to generate PDF report.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     private function getReportRows(Request $request, HrisClientService $hris) {
