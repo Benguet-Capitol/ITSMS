@@ -299,11 +299,9 @@ class InventoryReportController extends Controller
                   $rawDateAcquired = $inventory->parent_component?->date_acquired;
               }
               
-              // ── Obsolete check (raw value, before formatting) ──────────────────
               $isObsolete = $rawDateAcquired
                   ? Carbon::parse($rawDateAcquired)->lt(now()->subYears(5))
                   : false;
-              // ───────────────────────────────────────────────────────────────────
 
               return [
                   'property_number'  => $this->cleanPdfText($inventory->property_number),
