@@ -94,11 +94,11 @@
             font-style: italic;
         }
 
-        .aging-row td {
+        .eol-row td {
             background-color: #fff3cd;
         }
 
-        .aging-badge {
+        .eol-badge {
             display: inline-block;
             font-size: 7px;
             font-weight: bold;
@@ -111,12 +111,11 @@
         }
 
         .primary-row td {
-            background-color: #dbeafe;  /* light blue */
+            background-color: #dbeafe;
         }
 
-        /* Combined: primary + aging */
-        .primary-row.aging-row td {
-            background-color: #fef3c7;  /* aging amber takes priority */
+        .primary-row.eol-row td {
+            background-color: #fef3c7;
         }
 
         .primary-badge {
@@ -203,7 +202,7 @@
             <td>{{ $filters['status'] ?: 'All' }}</td>
         </tr>
         <tr>
-            <td class="meta-label">Aging Items</td>
+            <td class="meta-label">End of Useful Life (EOL) Items</td>
             <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
                 {{ $obsoleteCount }} item{{ $obsoleteCount !== 1 ? 's' : '' }}
                 ({{ count($rows) > 0 ? round(($obsoleteCount / count($rows)) * 100, 1) : 0 }}% of total)
@@ -227,7 +226,7 @@
         </thead>
         <tbody>
             @forelse ($rows as $index => $row)
-                <tr class="{{ $row['is_obsolete'] ? 'aging-row' : '' }} {{ $row['is_primary'] ? 'primary-row' : '' }}">
+                <tr class="{{ $row['is_obsolete'] ? 'eol-row' : '' }} {{ $row['is_primary'] ? 'primary-row' : '' }}">
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $row['division_section'] ?: '—' }}</td>
                     <td>{{ $row['employee_name'] ?: '—' }}</td>
@@ -235,7 +234,7 @@
                     <td>
                         {{ $row['date_acquired'] ?: '—' }}
                         @if ($row['is_obsolete'])
-                            <br><span class="aging-badge">AGING</span>
+                            <br><span class="eol-badge">EOL</span>
                         @endif
                     </td>
                     <td>
@@ -258,7 +257,7 @@
 
     <div class="legend">
         <span class="legend-swatch"></span>
-        Highlighted rows indicate items acquired more than <strong>5 years</strong> ago and are considered <strong>aging</strong>.
+        Highlighted rows indicate items acquired more than <strong>5 years</strong> ago and are considered <strong>End of Useful Life (EOL)</strong>.
         &nbsp;&nbsp;
         <span style="display:inline-block; width:10px; height:10px; background-color:#dbeafe; border:1px solid #1d4ed8; vertical-align:middle; margin-right:4px;"></span>
         Blue rows indicate <strong>System Unit</strong> or <strong>Laptop</strong> items (parent devices).
@@ -271,7 +270,7 @@
             <tr>
                 <th>Item Type</th>
                 <th>Count</th>
-                <th>Aging Count</th>
+                <th>End of Useful Life (EOL) Count</th>
             </tr>
         </thead>
         <tbody>
