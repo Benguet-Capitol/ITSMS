@@ -94,15 +94,36 @@
             font-style: italic;
         }
 
-        .obsolete-row td {
+        .aging-row td {
             background-color: #fff3cd;
         }
 
-        .obsolete-badge {
+        .aging-badge {
             display: inline-block;
             font-size: 7px;
             font-weight: bold;
             background-color: #e65c00;
+            color: #ffffff;
+            padding: 1px 4px;
+            border-radius: 3px;
+            letter-spacing: 0.3px;
+            margin-top: 3px;
+        }
+
+        .primary-row td {
+            background-color: #dbeafe;  /* light blue */
+        }
+
+        /* Combined: primary + aging */
+        .primary-row.aging-row td {
+            background-color: #fef3c7;  /* aging amber takes priority */
+        }
+
+        .primary-badge {
+            display: inline-block;
+            font-size: 7px;
+            font-weight: bold;
+            background-color: #1d4ed8;
             color: #ffffff;
             padding: 1px 4px;
             border-radius: 3px;
@@ -182,7 +203,7 @@
             <td>{{ $filters['status'] ?: 'All' }}</td>
         </tr>
         <tr>
-            <td class="meta-label">Obsolete Items</td>
+            <td class="meta-label">Aging Items</td>
             <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
                 {{ $obsoleteCount }} item{{ $obsoleteCount !== 1 ? 's' : '' }}
                 ({{ count($rows) > 0 ? round(($obsoleteCount / count($rows)) * 100, 1) : 0 }}% of total)
@@ -206,7 +227,7 @@
         </thead>
         <tbody>
             @forelse ($rows as $index => $row)
-                <tr class="{{ $row['is_obsolete'] ? 'obsolete-row' : '' }}">
+                <tr class="{{ $row['is_obsolete'] ? 'aging-row' : '' }} {{ $row['is_primary'] ? 'primary-row' : '' }}">
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>{{ $row['division_section'] ?: '—' }}</td>
                     <td>{{ $row['employee_name'] ?: '—' }}</td>
@@ -214,10 +235,16 @@
                     <td>
                         {{ $row['date_acquired'] ?: '—' }}
                         @if ($row['is_obsolete'])
-                            <br><span class="obsolete-badge">OBSOLETE</span>
+                            <br><span class="aging-badge">AGING</span>
                         @endif
                     </td>
-                    <td>{{ $row['item_type'] ?: '—' }}</td>
+                    <td>
+                      {{ $row['item_type'] ?: '—' }}
+                      @if ($row['is_primary'])
+                        <br><span class="primary-badge">PARENT</span>
+                      @endif
+                    </td>
+                     
                     <td>{{ $row['brand_model'] ?: '—' }}</td>
                     <td style="white-space: pre-line;">{{ $row['child_components'] ?: '—' }}</td>
                 </tr>
@@ -231,7 +258,10 @@
 
     <div class="legend">
         <span class="legend-swatch"></span>
-        Highlighted rows indicate items with a date acquired of more than <strong>5 years</strong> ago and are considered <strong>obsolete</strong>.
+        Highlighted rows indicate items acquired more than <strong>5 years</strong> ago and are considered <strong>aging</strong>.
+        &nbsp;&nbsp;
+        <span style="display:inline-block; width:10px; height:10px; background-color:#dbeafe; border:1px solid #1d4ed8; vertical-align:middle; margin-right:4px;"></span>
+        Blue rows indicate <strong>System Unit</strong> or <strong>Laptop</strong> items (parent devices).
     </div>
 
     <div class="summary-title">Item Type Summary</div>
@@ -241,24 +271,36 @@
             <tr>
                 <th>Item Type</th>
                 <th>Count</th>
+                <th>Aging Count</th>
             </tr>
         </thead>
         <tbody>
-            @forelse ($summary as $itemType => $count)
+            @forelse ($summary as $itemType => $data)
                 <tr>
                     <td>{{ $itemType ?: 'Unspecified' }}</td>
-                    <td>{{ $count }}</td>
+                    <td>{{ $data['count'] }}</td>
+                    <td>
+                        @if ($data['obsolete'] > 0)
+                            <span style="color: #7a4f00; font-weight: bold;">{{ $data['obsolete'] }}</span>
+                        @else
+                            —
+                        @endif
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="2">No summary available.</td>
+                    <td colspan="3">No summary available.</td>
                 </tr>
             @endforelse
 
+            {{-- Total row --}}
             @if (count($rows) > 0)
                 <tr style="border-top: 2px solid #bfbfbf;">
                     <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
-                        &#9654; Obsolete Items (&gt;5 yrs)
+                        Aging Items Total  
+                    </td>
+                    <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
+                        {{ array_sum(array_column($summary->toArray(), 'count')) }}
                     </td>
                     <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
                         {{ $obsoleteCount }}

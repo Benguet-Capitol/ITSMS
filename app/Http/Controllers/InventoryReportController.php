@@ -131,9 +131,12 @@ class InventoryReportController extends Controller
             ];
 
             $summary = collect($rows)
-                ->groupBy('item_type')
-                ->map(fn ($items) => count($items))
-                ->sortKeys();
+              ->groupBy('item_type')
+              ->map(fn ($items) => [
+                  'count'    => count($items),
+                  'obsolete' => collect($items)->filter(fn ($r) => $r['is_obsolete'])->count(),
+              ])
+              ->sortKeys();
 
             $customPaper = [0, 0, 576, 936];
 
@@ -327,6 +330,7 @@ class InventoryReportController extends Controller
                           ? Carbon::parse($rawDateAcquired)->format('F d, Y')
                           : ''
                   ),
+                  'is_primary'  => in_array(strtolower($inventory->item_type?->type ?? ''), ['system unit', 'laptop']),
                   'is_obsolete'      => $isObsolete,
               ];
           });
