@@ -296,10 +296,10 @@
             {{-- Total row --}}
             @if (count($rows) > 0)
                 <tr style="border-top: 2px solid #bfbfbf;">
-                    <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
-                        Aging Items Total  
+                    <td style="font-weight: bold;">
+                        Items Total  
                     </td>
-                    <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
+                    <td style="font-weight: bold;">
                         {{ array_sum(array_column($summary->toArray(), 'count')) }}
                     </td>
                     <td style="background-color: #fff3cd; font-weight: bold; color: #7a4f00;">
