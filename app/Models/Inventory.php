@@ -10,10 +10,14 @@ class Inventory extends Model
 
     protected $casts = [
         'employee_id' => 'integer',
+        'office_id' => 'integer',
     ];
 
     protected $fillable = [
         'employee_id',
+        'office_id',
+        'office_code',
+        'office_name',
         'item_type_id',
         'brand_model_id',
         'parent_component_id',
@@ -90,5 +94,10 @@ class Inventory extends Model
 
       // Otherwise fallback to item_type->brand_model
       return $this->item_type?->brand_model;
+    }
+
+    public function getResolvedOfficeNameAttribute(): ?string {
+        return $this->office_name
+            ?: $this->parent_component?->office_name;
     }
 }

@@ -133,6 +133,7 @@ class RolesAndPermissionsSeeder extends Seeder
 
                 // Tickets — intake only (create + view; no lifecycle transitions)
                 'tickets.view',
+                'tickets.update',
                 'tickets.create',
                 'tickets.print_assessment',
 
