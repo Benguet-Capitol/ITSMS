@@ -153,7 +153,7 @@ class InventoryController extends Controller
             $inventory->office_code !== ($data['office_code'] ?? null) ||
             $inventory->office_name !== ($data['office_name'] ?? null);
 
-        $cascadeOfficeItemTypeIds = [1, 164, 17];
+        $cascadeOfficeItemTypeIds = [1, 164];
 
         $inventory->update($data);
 
