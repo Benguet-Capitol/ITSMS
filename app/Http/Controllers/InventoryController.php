@@ -144,55 +144,66 @@ class InventoryController extends Controller
     }
 
     public function update(UpdateInventoryRequest $request, Inventory $inventory) {
-      Gate::authorize('inventories.update');
+        Gate::authorize('inventories.update');
 
-      $data = $request->validated();
+        $data = $request->validated();
 
-      $inventory->update($data);
+        $officeChanged =
+            $inventory->office_id !== ($data['office_id'] ?? null) ||
+            $inventory->office_code !== ($data['office_code'] ?? null) ||
+            $inventory->office_name !== ($data['office_name'] ?? null);
 
-      // 2. Handle internal components if item_type_id = 1
-      if ((int) $data['item_type_id'] === 1) {
-        $newComponents = $data['internal_components'] ?? [];
+        $cascadeOfficeItemTypeIds = [1, 164, 17];
 
-        // Get current component IDs in DB
-        $existingIds = $inventory->internal_components()->pluck('id')->toArray();
+        $inventory->update($data);
 
-        // IDs from the request (existing ones)
-        $incomingIds = collect($newComponents)
-            ->pluck('id') // 'id' might be missing for new components
-            ->filter()
-            ->toArray();
-
-        // Delete components that are in DB but not in request
-        $toDelete = array_diff($existingIds, $incomingIds);
-        InventoryInternalComponent::whereIn('id', $toDelete)->delete();
-
-        // Add or update components from request
-        foreach ($newComponents as $component) {
-            if (isset($component['id']) && in_array($component['id'], $existingIds)) {
-                // Update existing
-                $comp = InventoryInternalComponent::find($component['id']);
-                $comp->update([
-                    'brand_model_id' => $component['brand_model']['id'],
-                    'quantity'       => $component['quantity'],
+        if (
+            $officeChanged &&
+            in_array((int) $inventory->item_type_id, $cascadeOfficeItemTypeIds, true)
+        ) {
+            Inventory::where('parent_component_id', $inventory->id)
+                ->update([
+                    'office_id' => $inventory->office_id,
+                    'office_code' => $inventory->office_code,
+                    'office_name' => $inventory->office_name,
                 ]);
-            } else {
-                // Create new
-                InventoryInternalComponent::create([
-                    'inventory_id'   => $inventory->id,
-                    'brand_model_id' => $component['brand_model']['id'],
-                    'quantity'       => $component['quantity'],
-                ]);
-            }
         }
-      } else {
-        // If item type changed, remove all internal components
-        $inventory->internal_components()->delete();
-      }
 
-      $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
+        if ((int) $data['item_type_id'] === 1) {
+            $newComponents = $data['internal_components'] ?? [];
 
-      return new InventoryResource($inventory);
+            $existingIds = $inventory->internal_components()->pluck('id')->toArray();
+
+            $incomingIds = collect($newComponents)
+                ->pluck('id')
+                ->filter()
+                ->toArray();
+
+            $toDelete = array_diff($existingIds, $incomingIds);
+            InventoryInternalComponent::whereIn('id', $toDelete)->delete();
+
+            foreach ($newComponents as $component) {
+                if (isset($component['id']) && in_array($component['id'], $existingIds)) {
+                    $comp = InventoryInternalComponent::find($component['id']);
+                    $comp->update([
+                        'brand_model_id' => $component['brand_model']['id'],
+                        'quantity' => $component['quantity'],
+                    ]);
+                } else {
+                    InventoryInternalComponent::create([
+                        'inventory_id' => $inventory->id,
+                        'brand_model_id' => $component['brand_model']['id'],
+                        'quantity' => $component['quantity'],
+                    ]);
+                }
+            }
+        } else {
+            $inventory->internal_components()->delete();
+        }
+
+        $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
+
+        return new InventoryResource($inventory);
     }
 
     public function destroy(Inventory $inventory) {
