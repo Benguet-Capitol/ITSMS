@@ -73,24 +73,19 @@ class OfficeController extends Controller
     }
 
     public function search(Request $request, HrisClientService $hris) {
-      Gate::authorize('offices.view');
-      
-      $q = trim((string) $request->input('q', ''));
-      $limit = (int) $request->input('limit', 20);
+        Gate::authorize('offices.view');
 
-      if (mb_strlen($q) < 1) {
-          return response()->json(['data' => []]);
-      }
+        $q = trim((string) $request->input('q', ''));
+        $limit = (int) $request->input('limit', 20);
 
-      $rows = $hris->searchOffices($q, $limit);
+        if (mb_strlen($q) < 1) {
+            return response()->json(['data' => []]);
+        }
 
-      $data = collect($rows)->map(fn ($office) => [
-          'id' => $office['id'] ?? null,
-          'office_code' => $office['office_code'] ?? null,
-          'office_desc' => $office['office_desc'] ?? null,
-          'label' => ($office['office_code'] ?? '') . ' - ' . ($office['office_desc'] ?? ''),
-      ])->values();
+        $rows = $hris->searchOffices($q, $limit);
 
-      return response()->json(['data' => $data]);
+        return response()->json([
+            'data' => OfficeResource::collection(collect($rows)->values()),
+        ]);
     }
 }

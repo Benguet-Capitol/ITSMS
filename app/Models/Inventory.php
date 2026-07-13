@@ -18,6 +18,8 @@ class Inventory extends Model
         'office_id',
         'office_code',
         'office_name',
+        'division_id',
+        'division_name',
         'item_type_id',
         'brand_model_id',
         'parent_component_id',

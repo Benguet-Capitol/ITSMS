@@ -27,6 +27,8 @@ class StoreInventoryRequest extends FormRequest
             'office_id' => ['nullable', 'integer'],
             'office_code' => ['nullable', 'string', 'max:255'],
             'office_name' => ['nullable', 'string', 'max:255'],
+            'division_id' => ['nullable', 'integer'],
+            'division_name' => ['nullable', 'string', 'max:255'],
             'item_type_id' => ['nullable', 'exists:item_types,id'],
             'brand_model_id' => ['nullable', 'exists:brand_models,id'],
             'parent_component_id' => ['nullable', 'exists:inventories,id'],

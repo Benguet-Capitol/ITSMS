@@ -20,6 +20,7 @@ class OfficeResource extends JsonResource
             'office_desc' => $this['office_desc'] ?? null,
             'created_at' => $this['created_at'] ?? null,
             'updated_at' => $this['updated_at'] ?? null,
+            'divisions' => $this['divisions'] ?? [],
 
             // Handy aliases for UI
             'code' => $this['office_code'] ?? null,

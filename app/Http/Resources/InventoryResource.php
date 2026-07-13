@@ -56,6 +56,9 @@ class InventoryResource extends JsonResource
             'office_code' => $this->office_code,
             'office_name' => $this->office_name,
 
+            'division_id' => $this->division_id,
+            'division_name' => $this->division_name,
+
             'item_type' => $item_type,
             'inventory' => $parent_inventory,
 
