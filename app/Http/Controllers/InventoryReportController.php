@@ -96,10 +96,21 @@ class InventoryReportController extends Controller
         Gate::authorize('inventories.report');
 
         try {
-            ini_set('memory_limit', '512M');
-            set_time_limit(120);
+            ini_set('memory_limit', '1024M');
+            set_time_limit(300);
 
             $rows = $this->getReportRows($request, $hris);
+
+            Log::info('Inventory PDF export started', [
+                'rows' => $rows->count(),
+                'filters' => $request->only(['office', 'division', 'employee', 'item_type', 'status']),
+            ]);
+
+            if ($rows->count() > 1000) {
+                return response()->json([
+                    'message' => 'PDF export is too large without filters. Please use at least one filter or export to Excel.',
+                ], 422);
+            }
 
             $obsoleteCount = $rows->filter(fn ($row) => $row['is_obsolete'])->count();
 
@@ -107,19 +118,21 @@ class InventoryReportController extends Controller
             $itemType = ItemType::find($request->input('item_type'));
             $employee = $employees->firstWhere('id', (int) $request->input('employee'));
 
-            $officeDesc = null;
-            $officeCode = null;
+            // $officeDesc = null;
+            // $officeCode = null;
 
-            if ($request->filled('office')) {
-                $officeId = (string) $request->input('office');
+            // if ($request->filled('office')) {
+            //     $officeId = (string) $request->input('office');
 
-                $matchedEmployee = $employees->first(function ($employee) use ($officeId) {
-                    return (string) data_get($employee, 'office_id') === $officeId;
-                });
+            //     $matchedEmployee = $employees->first(function ($employee) use ($officeId) {
+            //         return (string) data_get($employee, 'office_id') === $officeId;
+            //     });
 
-                $officeDesc = data_get($matchedEmployee, 'office_desc');
-                $officeCode = data_get($matchedEmployee, 'office_code');
-            }
+            //     $officeDesc = data_get($matchedEmployee, 'office_desc');
+            //     $officeCode = data_get($matchedEmployee, 'office_code');
+            // }
+            $officeDesc = $this->cleanPdfText($request->input('office_name')) ?: 'All';
+            $officeCode = $this->cleanPdfText($request->input('office_name')) ?: null;
 
             $filters = [
                 'item_type' => $itemType?->type ?? 'All',
@@ -127,6 +140,7 @@ class InventoryReportController extends Controller
                     ?: data_get($employee, 'full_name')
                     ?: 'All',
                 'office' => $officeDesc ?: 'All',
+                'division' => $this->cleanPdfText($request->input('division_name')) ?: 'All',
                 'status' => $this->cleanPdfText($request->input('status')) ?: 'All',
             ];
 
@@ -152,6 +166,10 @@ class InventoryReportController extends Controller
 
             if (!empty($officeCode)) {
                 $filenameParts[] = $officeCode;
+            }
+
+            if (!empty($filters['division']) && $filters['division'] !== 'All') {
+                $filenameParts[] = $filters['division'];
             }
 
             if (!empty($filters['employee']) && $filters['employee'] !== 'All') {
@@ -236,6 +254,17 @@ class InventoryReportController extends Controller
                 $q->where('office_id', $officeId)
                   ->orWhereHas('parent_component', function ($q2) use ($officeId) {
                       $q2->where('office_id', $officeId);
+                  });
+            });
+        }
+
+        if ($request->filled('division')) {
+            $divisionId = (int) $request->input('division');
+
+            $query->where(function ($q) use ($divisionId) {
+                $q->where('division_id', $divisionId)
+                  ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
+                      $q2->where('division_id', $divisionId);
                   });
             });
         }

@@ -190,16 +190,16 @@
             <td>{{ count($rows) }}</td>
         </tr>
         <tr>
-            <td class="meta-label">Item Type</td>
-            <td>{{ $filters['item_type'] ?: 'All' }}</td>
             <td class="meta-label">Employee</td>
             <td>{{ $filters['employee'] ?: 'All' }}</td>
+            <td class="meta-label">Item Type</td>
+            <td>{{ $filters['item_type'] ?: 'All' }}</td>
         </tr>
         <tr>
             <td class="meta-label">Office (Item Location)</td>
             <td>{{ $filters['office'] ?: 'All' }}</td>
-            <td class="meta-label">Status</td>
-            <td>{{ $filters['status'] ?: 'All' }}</td>
+            <td class="meta-label">Division</td>
+            <td>{{ $filters['division'] ?: 'All' }}</td>
         </tr>
         <tr>
             <td class="meta-label">End of Useful Life (EOL) Items</td>
@@ -207,7 +207,8 @@
                 {{ $obsoleteCount }} item{{ $obsoleteCount !== 1 ? 's' : '' }}
                 ({{ count($rows) > 0 ? round(($obsoleteCount / count($rows)) * 100, 1) : 0 }}% of total)
             </td>
-            <td colspan="2"></td>
+            <td class="meta-label">Status</td>
+            <td>{{ $filters['status'] ?: 'All' }}</td>
         </tr>
     </table>
 
