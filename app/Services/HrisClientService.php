@@ -99,15 +99,7 @@ class HrisClientService
             return $this->getEmployeesWithParams(['employee_id' => $q]);
         }
 
-        // Prefer remote filtering if HRIS supports it
-        $rows = $this->getEmployeesWithParams(['q' => $q], 5);
-
-        if (!empty($rows)) {
-            return collect($rows)->take($limit)->values()->all();
-        }
-
-        // Fallback: direct fetch, no cache
-        $rows = $this->getEmployees();
+        $rows = $this->getEmployeesCached(10);
         $needle = mb_strtolower($q);
 
         return collect($rows)
