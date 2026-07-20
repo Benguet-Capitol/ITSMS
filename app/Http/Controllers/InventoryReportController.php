@@ -236,22 +236,22 @@ class InventoryReportController extends Controller
             ]);
 
         if ($request->filled('item_type')) {
-            $query->where('item_type_id', $request->input('item_type'));
+            $query->where('inventories.item_type_id', $request->input('item_type'));
         }
 
         if ($request->filled('employee')) {
-            $query->where('employee_id', (int) $request->input('employee'));
+            $query->where('inventories.employee_id', (int) $request->input('employee'));
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $query->where('inventories.status', $request->input('status'));
         }
 
         if ($request->filled('office')) {
             $officeId = (int) $request->input('office');
 
             $query->where(function ($q) use ($officeId) {
-                $q->where('office_id', $officeId)
+                $q->where('inventories.office_id', $officeId)
                   ->orWhereHas('parent_component', function ($q2) use ($officeId) {
                       $q2->where('office_id', $officeId);
                   });
@@ -262,7 +262,7 @@ class InventoryReportController extends Controller
             $divisionId = (int) $request->input('division');
 
             $query->where(function ($q) use ($divisionId) {
-                $q->where('division_id', $divisionId)
+                $q->where('inventories.division_id', $divisionId)
                   ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
                       $q2->where('division_id', $divisionId);
                   });
@@ -270,7 +270,11 @@ class InventoryReportController extends Controller
         }
 
         return $query
-          ->orderBy('property_number')
+          ->leftJoin('inventories as parent_inv', 'inventories.parent_component_id', '=', 'parent_inv.id')
+          ->select('inventories.*')
+          ->orderByRaw('COALESCE(inventories.division_name, parent_inv.division_name) IS NULL')
+          ->orderByRaw('COALESCE(inventories.division_name, parent_inv.division_name) ASC')
+          ->orderBy('inventories.property_number')
           ->get()
           ->map(function ($inventory) use ($employeeMap) {
               $effectiveEmployeeId = $inventory->employee_id ?: $inventory->parent_component?->employee_id;
@@ -290,6 +294,8 @@ class InventoryReportController extends Controller
                   ?: data_get($employee, 'section')
                   ?: data_get($employee, 'division_desc')
                   ?: data_get($employee, 'section_desc');
+
+            $inventoryDivision = $inventory->division_name ?: $inventory->parent_component?->division_name;
 
               $employeeDisplay = $employeeName ?: '';
               if ($employeeOffice) {
@@ -353,6 +359,7 @@ class InventoryReportController extends Controller
                   'property_number'  => $this->cleanPdfText($propertyNumberDisplay),
                   'employee_name'    => $this->cleanPdfText($employeeDisplay),
                   'office'           => $this->cleanPdfText($inventoryOffice),
+                  'division'         => $this->cleanPdfText($inventoryDivision),
                   'division_section' => $this->cleanPdfText($divisionSection),
                   'item_type'        => $this->cleanPdfText($inventory->item_type?->type),
                   'brand_model'      => $this->cleanPdfText($brandModelDisplay),

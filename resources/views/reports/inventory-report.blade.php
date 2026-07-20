@@ -216,7 +216,7 @@
         <thead>
             <tr>
                 <th class="no-col">NO.</th>
-                {{-- <th class="division-col">DIVISION / SECTION</th> --}}
+                <th class="division-col">DIVISION</th>
                 <th class="employee-col">ACTUAL USER</th>
                 <th class="property-col">PROPERTY NUMBER</th>
                 <th class="office-col">DATE ACQUIRED</th>
@@ -229,7 +229,7 @@
             @forelse ($rows as $index => $row)
                 <tr class="{{ $row['is_obsolete'] ? 'eol-row' : '' }} {{ $row['is_primary'] ? 'primary-row' : '' }}">
                     <td class="text-center">{{ $index + 1 }}</td>
-                    {{-- <td>{{ $row['division_section'] ?: '—' }}</td> --}}
+                    <td>{{ $row['division'] ?: '—' }}</td>
                     <td style="white-space: pre-line;">{{ $row['employee_name'] ?: '—' }}</td>
                     <td style="white-space: pre-line;">{{ $row['property_number'] ?: '—' }}</td>
                     <td> 
