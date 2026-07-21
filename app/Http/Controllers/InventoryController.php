@@ -57,7 +57,25 @@ class InventoryController extends Controller
 
         // ── Office filter ────────────────────────────────────────────────────────
         if ($request->filled('office_id')) {
-            $baseQuery->where('office_id', (int) $request->input('office_id'));
+            $officeId = (int) $request->input('office_id');
+
+            $baseQuery->where(function ($q) use ($officeId) {
+                $q->where('office_id', $officeId)
+                  ->orWhereHas('parent_component', function ($q2) use ($officeId) {
+                      $q2->where('office_id', $officeId);
+                  });
+            });
+        }
+
+        if ($request->filled('division_id')) { // !? not used in frontend
+            $divisionId = (int) $request->input('division_id');
+
+            $baseQuery->where(function ($q) use ($divisionId) {
+                $q->where('division_id', $divisionId)
+                  ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
+                      $q2->where('division_id', $divisionId);
+                  });
+            });
         }
 
         // ── Tab filter ───────────────────────────────────────────────────────────
