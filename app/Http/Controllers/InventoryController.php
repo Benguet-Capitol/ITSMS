@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Inventory;
-use Illuminate\Http\Request;
-use App\Http\Resources\InventoryResource;
-use App\Models\InventoryInternalComponent;
 use App\Http\Requests\StoreInventoryRequest;
 use App\Http\Requests\UpdateInventoryRequest;
+use App\Http\Resources\InventoryResource;
+use App\Models\Inventory;
+use App\Models\InventoryInternalComponent;
+use App\Models\ItemType;
 use App\Services\HrisClientService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class InventoryController extends Controller
@@ -67,6 +68,10 @@ class InventoryController extends Controller
             });
         }
 
+        if ($request->filled('item_type')) {
+            $baseQuery->where('item_type_id', $request->item_type);
+        }
+
         if ($request->filled('division_id')) { // !? not used in frontend
             $divisionId = (int) $request->input('division_id');
 
@@ -122,25 +127,27 @@ class InventoryController extends Controller
     }
 
     public function store(StoreInventoryRequest $request) {
-      Gate::authorize('inventories.create');
-      
-      $data = $request->validated();
-      
-      $inventory = Inventory::create($data);
-      
-      if ((int) $data['item_type_id'] === 1) {
-        foreach ($data['internal_components'] ?? [] as $component) {
-          InventoryInternalComponent::create([
-              'inventory_id'   => $inventory->id,
-              'brand_model_id' => $component['brand_model']['id'],
-              'quantity'       => $component['quantity'],
-          ]);
+        Gate::authorize('inventories.create');
+
+        $data = $request->validated();
+
+        $inventory = Inventory::create($data);
+
+        $itemType = ItemType::find($data['item_type_id']);
+
+        if ($itemType?->is_main_inventory) {
+            foreach ($data['internal_components'] ?? [] as $component) {
+                InventoryInternalComponent::create([
+                    'inventory_id'   => $inventory->id,
+                    'brand_model_id' => $component['brand_model']['id'],
+                    'quantity'       => $component['quantity'],
+                ]);
+            }
         }
-      }
 
-      $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
+        $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
 
-      return new InventoryResource($inventory);
+        return new InventoryResource($inventory);
     }
 
     public function update(UpdateInventoryRequest $request, Inventory $inventory) {
@@ -153,13 +160,13 @@ class InventoryController extends Controller
             $inventory->office_code !== ($data['office_code'] ?? null) ||
             $inventory->office_name !== ($data['office_name'] ?? null);
 
-        $cascadeOfficeItemTypeIds = [1, 164];
-
         $inventory->update($data);
+
+        $itemType = ItemType::find($inventory->item_type_id);
 
         if (
             $officeChanged &&
-            in_array((int) $inventory->item_type_id, $cascadeOfficeItemTypeIds, true)
+            $itemType?->is_main_inventory
         ) {
             Inventory::where('parent_component_id', $inventory->id)
                 ->update([
@@ -171,7 +178,7 @@ class InventoryController extends Controller
                 ]);
         }
 
-        if ((int) $data['item_type_id'] === 1) {
+        if ($itemType?->is_main_inventory) {
             $newComponents = $data['internal_components'] ?? [];
 
             $existingIds = $inventory->internal_components()->pluck('id')->toArray();
@@ -185,9 +192,9 @@ class InventoryController extends Controller
             InventoryInternalComponent::whereIn('id', $toDelete)->delete();
 
             foreach ($newComponents as $component) {
-                if (isset($component['id']) && in_array($component['id'], $existingIds)) {
+                if (isset($component['id']) && in_array($component['id'], $existingIds, true)) {
                     $comp = InventoryInternalComponent::find($component['id']);
-                    $comp->update([
+                    $comp?->update([
                         'brand_model_id' => $component['brand_model']['id'],
                         'quantity' => $component['quantity'],
                     ]);

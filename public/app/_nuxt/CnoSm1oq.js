@@ -1,0 +1,1 @@
+import{aT as i,E as a,ar as t}from"./xL5-1YFs.js";const o=i(e=>{if(!e.meta.permission)return;const s=a(),r=e.meta.permission;if(s.value?.permissions?.[r]!==!0)return t("/unauthorized",{replace:!0})});export{o as default};
