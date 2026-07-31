@@ -29,6 +29,7 @@ class Ticket extends Model
         'released_at',
         'contact_number',
         'full_name',
+        'client_name',
         'is_other_agency',
         'quality',
         'efficiency',
