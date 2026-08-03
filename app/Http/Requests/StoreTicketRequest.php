@@ -11,29 +11,19 @@ use Illuminate\Validation\Validator;
 
 class StoreTicketRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return Auth::check();
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
-     */
     public function rules(): array
     {
         return [
             'profile_id' => 'required|exists:profiles,id',
-            // 'employee_id' => 'required|exists:employees,id',
             'inventory_id' => 'nullable|exists:inventories,id',
             'it_service_id' => 'required|exists:it_services,id',
-            'item_type_id' => 'nullable|exists:item_types,id',
+            'item_type_id' => 'required|exists:item_types,id',
             'agency_id' => 'nullable|exists:agencies,id',
-            // 'ticket_number' => 'required|string|max:255|unique:it_services,ticket_number',
             'concern' => 'required|string',
             'query_status' => ['required', new Enum(TicketStatus::class)],
             'request_status' => 'nullable|string',
@@ -52,8 +42,9 @@ class StoreTicketRequest extends FormRequest
         $validator->after(function (Validator $validator) {
             $inventoryId = $this->input('inventory_id');
 
-            // Only check if an inventory is attached (other agency tickets won't have one)
-            if (!$inventoryId) return;
+            if (!$inventoryId) {
+                return;
+            }
 
             $closedStatuses = [
                 TicketStatus::Resolved,
@@ -67,27 +58,22 @@ class StoreTicketRequest extends FormRequest
 
             if ($hasOpenTicket) {
                 $validator->errors()->add(
-                    'inventory',
+                    'inventory_id',
                     'This inventory item already has an open ticket. Please close it before creating a new one.'
                 );
             }
         });
     }
 
-    public function messages(): array {
+    public function messages(): array
+    {
         return [
-            'profile_id.required'   => 'The :attribute is required.',
-            // 'employee_id.required'   => 'The :attribute is required.',
-            'inventory_id.required'   => 'The :attribute is required.',
-            'it_service_id.required'   => 'The :attribute is required.',
-            'item_type_id.required'   => 'The :attribute is required.',
-            'agency_id.required'   => 'The :attribute is required.',
-            'ticket_number.required'   => 'The :attribute is required.',
-            'concern.required'   => 'The :attribute is required.',
-            'query_status.required'   => 'The :attribute is required.',
-            'request_status.required'   => 'The :attribute is required.',
-            'priority.required'   => 'The :attribute is required.',
-            'date.required'   => 'The :attribute is required.',
+            'profile_id.required' => 'The :attribute is required.',
+            'it_service_id.required' => 'The :attribute is required.',
+            'item_type_id.required' => 'The :attribute is required.',
+            'concern.required' => 'The :attribute is required.',
+            'query_status.required' => 'The :attribute is required.',
+            'date.required' => 'The :attribute is required.',
             'client_name.max' => 'The :attribute may not be greater than 255 characters.',
         ];
     }

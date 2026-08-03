@@ -4,6 +4,8 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use App\Models\ItemType;
+use Illuminate\Validation\Validator;
 
 class UpdateInventoryRequest extends FormRequest
 {
@@ -57,5 +59,24 @@ class UpdateInventoryRequest extends FormRequest
             // 'parent_component' => ['nullable', 'string', 'max:255'],
             // 'inventory_type' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function ($validator) {
+            $itemTypeId = $this->input('item_type_id');
+            $parentComponentId = $this->input('parent_component_id');
+
+            if ($parentComponentId && $itemTypeId) {
+                $itemType = ItemType::find($itemTypeId);
+
+                if ($itemType && ! $itemType->is_component) {
+                    $validator->errors()->add(
+                        'item_type_id',
+                        "{$itemType->type} cannot be added as a component."
+                    );
+                }
+            }
+        });
     }
 }
