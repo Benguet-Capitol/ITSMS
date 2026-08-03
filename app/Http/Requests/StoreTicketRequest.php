@@ -2,10 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ServiceMethod;
+use App\Enums\TicketStatus;
+use App\Models\Ticket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
-use App\Enums\TicketStatus;
-use App\Enums\ServiceMethod;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Validator;
 
@@ -34,6 +35,10 @@ class StoreTicketRequest extends FormRequest
             'is_other_agency' => 'boolean',
             'full_name' => 'nullable|string',
             'client_name' => 'nullable|string|max:255',
+
+            'office_id' => 'nullable|string|max:255',
+            'office_code' => 'nullable|string|max:255',
+            'office_desc' => 'nullable|string|max:255',
         ];
     }
 
@@ -41,10 +46,8 @@ class StoreTicketRequest extends FormRequest
     {
         $validator->after(function (Validator $validator) {
             $inventoryId = $this->input('inventory_id');
-
-            if (!$inventoryId) {
-                return;
-            }
+            $isOtherAgency = (bool) $this->input('is_other_agency');
+            $officeId = $this->input('office_id');
 
             $closedStatuses = [
                 TicketStatus::Resolved,
@@ -52,14 +55,23 @@ class StoreTicketRequest extends FormRequest
                 TicketStatus::Cancelled,
             ];
 
-            $hasOpenTicket = \App\Models\Ticket::where('inventory_id', $inventoryId)
-                ->whereNotIn('query_status', $closedStatuses)
-                ->exists();
+            if ($inventoryId) {
+                $hasOpenTicket = Ticket::where('inventory_id', $inventoryId)
+                    ->whereNotIn('query_status', $closedStatuses)
+                    ->exists();
 
-            if ($hasOpenTicket) {
+                if ($hasOpenTicket) {
+                    $validator->errors()->add(
+                        'inventory',
+                        'This inventory item already has an open ticket. Please close it before creating a new one.'
+                    );
+                }
+            }
+
+            if (!$inventoryId && !$isOtherAgency && !$officeId) {
                 $validator->errors()->add(
-                    'inventory_id',
-                    'This inventory item already has an open ticket. Please close it before creating a new one.'
+                    'office_id',
+                    'Office is required when no inventory is selected.'
                 );
             }
         });
@@ -75,6 +87,9 @@ class StoreTicketRequest extends FormRequest
             'query_status.required' => 'The :attribute is required.',
             'date.required' => 'The :attribute is required.',
             'client_name.max' => 'The :attribute may not be greater than 255 characters.',
+            'office_id.max' => 'The :attribute may not be greater than 255 characters.',
+            'office_code.max' => 'The :attribute may not be greater than 255 characters.',
+            'office_desc.max' => 'The :attribute may not be greater than 255 characters.',
         ];
     }
 }

@@ -33,12 +33,13 @@ class TicketResource extends JsonResource
         $inventoryEmployee = $employeeMap?->get((int) $inventory?->employee_id) ?? $employeeMap?->get((int) $inventory?->parent_component?->employee_id);
 
         $officeId =
-            data_get($inventoryEmployee, 'office_id') ??
-            data_get($inventoryEmployee, 'office.id') ??
-            data_get($inventoryEmployee, 'office.office_id') ??
-            data_get($inventoryEmployee, 'officeId') ??
-            data_get($inventoryEmployee, 'department_id') ??
-            data_get($inventoryEmployee, 'department.id');
+          $this->office_id ??
+          data_get($inventoryEmployee, 'office_id') ??
+          data_get($inventoryEmployee, 'office.id') ??
+          data_get($inventoryEmployee, 'office.office_id') ??
+          data_get($inventoryEmployee, 'officeId') ??
+          data_get($inventoryEmployee, 'department_id') ??
+          data_get($inventoryEmployee, 'department.id');
 
         $personnelOfficeAssigned = collect();
 
@@ -119,6 +120,10 @@ class TicketResource extends JsonResource
               'assessed_by'           => $this->assessment->assessed_by,
               'created_at'            => $this->assessment->created_at,
           ]),
+
+          'office_id' => $this->office_id,
+          'office_code' => $this->office_code,
+          'office_desc' => $this->office_desc,
         ];
     }
 }

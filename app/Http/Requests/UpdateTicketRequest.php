@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Validator;
 
 class UpdateTicketRequest extends FormRequest
 {
@@ -19,6 +20,9 @@ class UpdateTicketRequest extends FormRequest
             'item_type_id' => ['required', 'exists:item_types,id'],
             'it_service_id' => 'required|exists:it_services,id',
             'agency_id' => 'nullable|exists:agencies,id',
+            'office_id' => 'nullable|string|max:255',
+            'office_code' => 'nullable|string|max:255',
+            'office_desc' => 'nullable|string|max:255',
             'concern' => 'required|string',
             'priority' => 'nullable|string',
             'contact_number' => 'nullable|string',
@@ -26,6 +30,22 @@ class UpdateTicketRequest extends FormRequest
             'full_name' => 'nullable|string',
             'client_name' => 'nullable|string|max:255',
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $inventoryId = $this->input('inventory_id');
+            $isOtherAgency = filter_var($this->input('is_other_agency'), FILTER_VALIDATE_BOOLEAN);
+            $officeId = $this->input('office_id');
+
+            if (!$inventoryId && !$isOtherAgency && !$officeId) {
+                $validator->errors()->add(
+                    'office_id',
+                    'Office is required when no inventory is selected.'
+                );
+            }
+        });
     }
 
     public function messages(): array
