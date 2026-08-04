@@ -339,11 +339,19 @@ class TicketController extends Controller
         $employeeId = $ticket->inventory?->employee_id ?? $ticket->employee_id ?? null;
         $employee = $employeeMap->get((int) $employeeId);
 
+        $resolvedInventory = $ticket->inventory?->inventory ?? $ticket->inventory;
+        
         $office = $ticket->is_other_agency
             ? ($ticket->agency?->name ?? $ticket->agency?->abbreviation ?? '—')
-            : ($ticket->office_desc
-                ? "{$ticket->office_desc}" . ($ticket->office_code ? " ({$ticket->office_code})" : '')
-                : (data_get($employee, 'office_desc') ?? '—'));
+            : (
+                $ticket->office_desc
+                    ? "{$ticket->office_desc}" . ($ticket->office_code ? " ({$ticket->office_code})" : '')
+                    : (
+                        $resolvedInventory?->office_name
+                            ? "{$resolvedInventory->office_name}" . ($resolvedInventory?->office_code ? " ({$resolvedInventory->office_code})" : '')
+                            : (data_get($employee, 'office_desc') ?? '—')
+                    )
+            );
 
         $issuedTo = data_get($employee, 'fullname')
             ?? data_get($employee, 'full_name')
@@ -391,6 +399,10 @@ class TicketController extends Controller
           ?? $ticket->item_type?->type
           ?? '—';
 
+        $dateAcquired = $resolvedInventory?->date_acquired
+            ? \Carbon\Carbon::parse($resolvedInventory->date_acquired)->format('F d, Y')
+            : '—';
+
         $data = [
             'ticket'       => $ticket,
             'assessment'   => $ticket->assessment,
@@ -399,9 +411,7 @@ class TicketController extends Controller
             'office'       => $office,
             'item_name'    => $itemType,
             'property_no'  => $ticket->inventory?->property_number ?? '—',
-            'date_acquired'=> $ticket->inventory?->date_acquired
-                                ? \Carbon\Carbon::parse($ticket->inventory->date_acquired)->format('F d, Y')
-                                : '—',
+            'date_acquired' => $dateAcquired,
             'issued_to'    => $issuedTo,
             'brand_model'  => $brandModel ?? '—',
             'serial_number'=> $ticket->inventory?->serial_number ?? '—',
