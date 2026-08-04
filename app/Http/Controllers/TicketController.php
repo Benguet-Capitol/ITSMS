@@ -24,7 +24,21 @@ class TicketController extends Controller
       Gate::authorize('tickets.view');
 
       $profileId = Auth::user()->profile->id;
-      $baseQuery = Ticket::query();
+      $baseQuery = Ticket::query()->with([
+          'profile',
+          'inventory',
+          'inventory.item_type',
+          'inventory.brand_model',
+          'inventory.parent_component',
+          'inventory.parent_component.item_type',
+          'inventory.parent_component.brand_model',
+          'agency',
+          'itService',
+          'solution',
+          'solution.author',
+          'personnel',
+          'assessment',
+      ]);
 
       if ($request->filled('search')) {
           $search = $request->search;
@@ -301,8 +315,15 @@ class TicketController extends Controller
             'inventory.item_type',
             'inventory.brand_model',
             'inventory.brand_model.item_type',
+            'inventory.brand_model.brand',
+            'inventory.parent_component',
+            'inventory.parent_component.item_type',
+            'inventory.parent_component.brand_model',
+            'inventory.parent_component.brand_model.item_type',
+            'inventory.parent_component.brand_model.brand',
             'item_type',
             'profile',
+            'agency',
         ]);
 
         if (!$ticket->assessment) {
@@ -316,37 +337,72 @@ class TicketController extends Controller
 
         // Employee is on the inventory (not directly on ticket)
         $employeeId = $ticket->inventory?->employee_id ?? $ticket->employee_id ?? null;
-        $employee   = $employeeMap->get((int) $employeeId);
+        $employee = $employeeMap->get((int) $employeeId);
+
+        $office = $ticket->is_other_agency
+            ? ($ticket->agency?->name ?? $ticket->agency?->abbreviation ?? '—')
+            : ($ticket->office_desc
+                ? "{$ticket->office_desc}" . ($ticket->office_code ? " ({$ticket->office_code})" : '')
+                : (data_get($employee, 'office_desc') ?? '—'));
+
+        $issuedTo = data_get($employee, 'fullname')
+            ?? data_get($employee, 'full_name')
+            ?? $ticket->client_name
+            ?? $ticket->full_name
+            ?? '—';
+
+        $brandModelSource = $ticket->inventory?->brand_model ?? $ticket->inventory?->parent_component?->brand_model;
+
+        $brandModel = null;
+
+        if ($brandModelSource) {
+            $modelName = $brandModelSource->name ?? null;
+            $specification = $brandModelSource->specification ?? null;
+            $brandName = $brandModelSource->brand?->name ?? null;
+
+            $parts = array_filter(
+                [$modelName, $specification, $brandName],
+                fn ($value) => $value !== null && $value !== ''
+            );
+
+            $brandModel = !empty($parts) ? implode(', ', $parts) : null;
+        }
+
+        if (!$brandModel) {
+            $fallbackModel = $ticket->inventory?->model ?? null;
+            $fallbackSpecification = $ticket->inventory?->specification
+                ?? $ticket->inventory?->description
+                ?? null;
+            $fallbackBrand = $ticket->inventory?->brand?->name
+                ?? $ticket->inventory?->brand_name
+                ?? null;
+
+            $parts = array_filter(
+                [$fallbackModel, $fallbackSpecification, $fallbackBrand],
+                fn ($value) => $value !== null && $value !== ''
+            );
+
+            $brandModel = !empty($parts) ? implode(', ', $parts) : null;
+        }
 
         // Item type — prefer inventory, fall back to ticket
         $itemType = $ticket->inventory?->item_type?->type
-            ?? $ticket->item_type?->type
-            ?? '—';
-
-        // Brand/model
-        $brandModel = null;
-        if ($ticket->inventory?->brand_model) {
-            $bm = $ticket->inventory->brand_model;
-            $brandModel = $bm->name
-                ? "{$bm->item_type?->type} {$bm->specification}, {$bm->name}"
-                : "{$bm->item_type?->type}, {$bm->specification}";
-        }
+          ?? $ticket->inventory?->parent_component?->item_type?->type
+          ?? $ticket->item_type?->type
+          ?? '—';
 
         $data = [
             'ticket'       => $ticket,
             'assessment'   => $ticket->assessment,
             'date'         => now()->format('F d, Y'),
             'control_no'   => $ticket->ticket_number,
-            'office'       => data_get($employee, 'office_desc') ?? '—',
+            'office'       => $office,
             'item_name'    => $itemType,
             'property_no'  => $ticket->inventory?->property_number ?? '—',
             'date_acquired'=> $ticket->inventory?->date_acquired
                                 ? \Carbon\Carbon::parse($ticket->inventory->date_acquired)->format('F d, Y')
                                 : '—',
-            'issued_to'    => data_get($employee, 'fullname')
-                                ?? data_get($employee, 'full_name')
-                                ?? $ticket->full_name
-                                ?? '—',
+            'issued_to'    => $issuedTo,
             'brand_model'  => $brandModel ?? '—',
             'serial_number'=> $ticket->inventory?->serial_number ?? '—',
             'concern'      => $ticket->concern,
