@@ -16,6 +16,7 @@ class InventoryController extends Controller
 {
     public function index(Request $request, HrisClientService $hris) {
         Gate::authorize('inventories.view');
+
         $search   = trim((string) $request->input('search', ''));
         $tab      = (string) $request->input('tab', 'all');
         $perPage  = (int) $request->input('per_page', 10);
@@ -27,15 +28,6 @@ class InventoryController extends Controller
         // ── Search ──────────────────────────────────────────────────────────────
         if ($search !== '') {
             if (preg_match('/[a-zA-Z]/', $search)) {
-                // Name search — ask HRIS only for matching employees
-                $matched = collect($hris->searchEmployees($search))
-                    ->filter(fn ($e) => isset($e['id']))
-                    ->keys()
-                    ->map(fn ($v) => (int) $v)
-                    ->values()
-                    ->all();
-
-                // Re-key by id since searchEmployees returns a list, not a keyed map
                 $ids = collect($hris->searchEmployees($search))
                     ->filter(fn ($e) => isset($e['id']))
                     ->pluck('id')
@@ -43,10 +35,30 @@ class InventoryController extends Controller
                     ->values()
                     ->all();
 
-                empty($ids)
-                    ? $baseQuery->whereRaw('1=0')
-                    : $baseQuery->whereIn('employee_id', $ids);
+                $baseQuery->where(function ($q) use ($search, $ids) {
+                    if (!empty($ids)) {
+                        $q->whereIn('employee_id', $ids)
+                          ->orWhereHas('parent_component', function ($q2) use ($ids) {
+                              $q2->whereIn('employee_id', $ids);
+                          });
+                    }
 
+                    $q->orWhere('property_number', 'like', "%{$search}%")
+                      ->orWhere('serial_number', 'like', "%{$search}%")
+                      ->orWhere('ip_address', 'like', "%{$search}%");
+
+                    $q->orWhereHas('item_type', function ($q2) use ($search) {
+                        $q2->where('type', 'like', "%{$search}%");
+                    });
+
+                    $q->orWhereHas('brand_model', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
+
+                    $q->orWhereHas('internal_components.brand_model', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    });
+                });
             } else {
                 $baseQuery->where(function ($q) use ($search) {
                     $q->where('property_number', 'like', "%{$search}%")
@@ -72,7 +84,7 @@ class InventoryController extends Controller
             $baseQuery->where('item_type_id', $request->item_type);
         }
 
-        if ($request->filled('division_id')) { // !? not used in frontend
+        if ($request->filled('division_id')) {
             $divisionId = (int) $request->input('division_id');
 
             $baseQuery->where(function ($q) use ($divisionId) {

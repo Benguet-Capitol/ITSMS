@@ -110,6 +110,12 @@ class TicketResource extends JsonResource
               TicketStatus::AwaitingVendor
           ]) && !($this->accepted_by_me ?? false),
 
+          'can_unaccept' => ($this->accepted_by_me ?? false) && !in_array($this->query_status, [
+              TicketStatus::Resolved,
+              TicketStatus::Assessed,
+              TicketStatus::Cancelled,
+          ]),
+
           'assessment' => $this->whenLoaded('assessment', fn () => [
               'findings'              => $this->assessment->findings,
               'recommendations'       => $this->assessment->recommendations,

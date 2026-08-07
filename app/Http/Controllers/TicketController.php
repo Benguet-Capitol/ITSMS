@@ -188,6 +188,38 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
+    public function unaccept(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+
+        $profile = Auth::user()->profile;
+
+        if (!$profile) {
+            return response()->json(['error' => 'Profile not found.'], 404);
+        }
+
+        $isAccepted = $ticket->personnel()->where('profile_id', $profile->id)->exists();
+
+        if (!$isAccepted) {
+            return response()->json([
+                'error' => 'You have not accepted this ticket.',
+            ], 422);
+        }
+
+        $ticket->personnel()->detach($profile->id);
+
+        if ($ticket->personnel()->count() === 0 && $ticket->request_status === TicketStatus::Accepted) {
+            $ticket->update([
+                'query_status' => TicketStatus::Queued,
+                'request_status' => TicketStatus::Open,
+            ]);
+        }
+
+        ProfileEngagementService::syncTicket($ticket);
+
+        return new TicketResource($ticket);
+    }
+
     public function checkStock(Request $request, Ticket $ticket) {
       Gate::authorize('tickets.update');
       $ticket->update([
