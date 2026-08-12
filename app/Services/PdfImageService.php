@@ -22,7 +22,7 @@ class PdfImageService
 
     public function agencyLogos(): array {
         return [
-            'logo_province' => $this->toBase64(public_path('images/logo-benguet-seal-250x250.png')),
+            'logo_province' => $this->toBase64(public_path('images/logo-benguet-seal-1900-250x250.png')),
             'logo_bagong_pilipinas' => $this->toBase64(public_path('images/logo-bagong-pilipinas-250x250.png')),
             'logo_mis' => $this->toBase64(public_path('images/logo-mis-blue-250x250.png')),
         ];
