@@ -17,6 +17,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use App\Services\PdfImageService;
 
 class TicketController extends Controller
 {
@@ -41,11 +42,47 @@ class TicketController extends Controller
       ]);
 
       if ($request->filled('search')) {
-          $search = $request->search;
-          $baseQuery->where(function ($q) use ($search) {
-              $q->where('concern', 'LIKE', "%{$search}%")
-                ->orWhere('ticket_number', 'LIKE', "%{$search}%")
-                ->orWhere('full_name', 'LIKE', "%{$search}%");
+          $search = trim((string) $request->input('search', ''));
+
+          $baseQuery->where(function ($q) use ($search, $hris) {
+              $like = "%{$search}%";
+
+              // Ticket-level fields
+              $q->where('concern', 'LIKE', $like)
+                ->orWhere('ticket_number', 'LIKE', $like)
+                ->orWhere('full_name', 'LIKE', $like)
+                ->orWhere('client_name', 'LIKE', $like);
+
+              // If search has letters, also match HRIS employees
+              if (preg_match('/[a-zA-Z]/', $search)) {
+                  $employeeIds = collect($hris->searchEmployees($search))
+                      ->filter(fn ($e) => isset($e['id']))
+                      ->pluck('id')
+                      ->map(fn ($v) => (int) $v)
+                      ->values()
+                      ->all();
+
+                  if (!empty($employeeIds)) {
+                      $q->orWhereHas('inventory', function ($inv) use ($employeeIds) {
+                          $inv->whereIn('employee_id', $employeeIds)
+                              ->orWhereHas('parent_component', function ($pc) use ($employeeIds) {
+                                  $pc->whereIn('employee_id', $employeeIds);
+                              });
+                      });
+                  }
+              }
+
+              // Property number/serial/IP on inventory or parent component
+              $q->orWhereHas('inventory', function ($inv) use ($like) {
+                  $inv->where('property_number', 'like', $like)
+                      ->orWhere('serial_number', 'like', $like)
+                      ->orWhere('ip_address', 'like', $like)
+                      ->orWhereHas('parent_component', function ($pc) use ($like) {
+                          $pc->where('property_number', 'like', $like)
+                            ->orWhere('serial_number', 'like', $like)
+                            ->orWhere('ip_address', 'like', $like);
+                      });
+              });
           });
       }
 
@@ -93,9 +130,35 @@ class TicketController extends Controller
           $query->where('query_status', $request->query_status);
       }
 
+      $sortable = [
+          'ticket_number' => 'ticket_number',
+          'property_number' => 'property_number',   // special handling below
+          'full_name' => 'full_name',
+          'client' => 'client_name',
+          'query_status' => 'query_status',
+          'request_status' => 'request_status',
+          'priority' => 'priority',
+          'service_method' => 'service_method',
+          'date' => 'date',
+          'created_at' => 'created_at',
+      ];
+
       if ($request->filled('sort')) {
-          $order = $request->input('order', 'asc');
-          $query->orderBy($request->sort, $order);
+          $sortKey = $request->input('sort');
+          $order = $request->input('order', 'asc') === 'desc' ? 'desc' : 'asc';
+
+          if (isset($sortable[$sortKey])) {
+              if ($sortKey === 'property_number') {
+                  // sort via inventories.property_number
+                  $query->join('inventories', 'tickets.inventory_id', '=', 'inventories.id')
+                        ->orderBy('inventories.property_number', $order)
+                        ->select('tickets.*');
+              } else {
+                  $query->orderBy($sortable[$sortKey], $order);
+              }
+          } else {
+              $query->latest();
+          }
       } else {
           $query->latest();
       }
@@ -339,7 +402,7 @@ class TicketController extends Controller
       return new TicketResource($ticket);
     }
 
-    public function assessmentReport(Ticket $ticket, HrisClientService $hris) {
+    public function assessmentReport(Ticket $ticket, HrisClientService $hris, PdfImageService $pdfImages) {
         Gate::authorize('tickets.view');
         $ticket->load([
             'assessment',
@@ -458,6 +521,7 @@ class TicketController extends Controller
                 'KEYBOARD', 'MOUSE', 'SPEAKER', 'USB/FLASHDRIVE',
                 'AVR', 'UPS', 'PRINTER', 'SCANNER', 'Router / Switch', 'OTHERS',
             ],
+            ...$pdfImages->agencyLogos(),
         ];
 
         $pdf = Pdf::loadView('reports.ticket-assessment', $data)

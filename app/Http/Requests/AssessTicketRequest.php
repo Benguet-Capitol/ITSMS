@@ -28,10 +28,22 @@ class AssessTicketRequest extends FormRequest
             'reviewed_by_position'   => ['required', 'string', 'max:255'],
             'replacement_available'  => ['required', 'boolean'],
             'specifications'         => ['nullable', 'string'],
+            'acquisition_cost' => 'nullable|numeric|min:0|max:999999999.99',
             'components'             => ['nullable', 'array'],
             'components.*'           => ['string'],
             // 'assessed_by'            => ['required', 'string', 'max:255'],
             // 'assessed_by_position'   => ['required', 'string', 'max:255'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'findings.required' => 'The :attribute is required.',
+            'recommendations.required' => 'The :attribute is required.',
+            'reviewed_by.required' => 'The :attribute is required.',
+            'acquisition_cost.numeric' => 'The :attribute must be a valid number.',
+            'acquisition_cost.min' => 'The :attribute cannot be negative.',
         ];
     }
 }

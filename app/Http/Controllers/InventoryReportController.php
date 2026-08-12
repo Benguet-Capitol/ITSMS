@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PdfImageService;
 use App\Exports\InventoryReportExport;
 use App\Models\Inventory;
 use App\Models\ItemType;
@@ -92,7 +93,7 @@ class InventoryReportController extends Controller
       }
     }
 
-    public function exportPdf(Request $request, HrisClientService $hris) {
+    public function exportPdf(Request $request, HrisClientService $hris, PdfImageService $pdfImages) {
         Gate::authorize('inventories.report');
 
         try {
@@ -160,6 +161,7 @@ class InventoryReportController extends Controller
                 'generatedAt' => now(),
                 'obsoleteCount' => $obsoleteCount,
                 'summary' => $summary,
+                ...$pdfImages->agencyLogos(),
             ])->setPaper($customPaper, 'landscape');
 
             $filenameParts = ['Inventory-Report'];
