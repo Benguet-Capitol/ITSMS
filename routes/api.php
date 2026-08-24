@@ -1,174 +1,366 @@
 <?php
 
 use App\Enums\TicketStatus;
-use Illuminate\Http\Request;
-use App\Http\Middleware\AuthGates;
-use App\Http\Resources\UserResource;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\RoleController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\BrandController;
 use App\Http\Controllers\AgencyController;
-use App\Http\Controllers\TicketController;
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\EmployeeController;
-use App\Http\Controllers\ItemTypeController;
-use App\Http\Controllers\ItSupplyController;
-use App\Http\Controllers\PositionController;
-use App\Http\Controllers\SolutionController;
-use App\Http\Controllers\InventoryController;
-use App\Http\Controllers\ItServiceController;
+use App\Http\Controllers\BrandController;
 use App\Http\Controllers\BrandModelController;
-use App\Http\Controllers\DepartmentController;
-use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\CommonProblemController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryReportController;
+use App\Http\Controllers\ItServiceController;
+use App\Http\Controllers\ItSupplyController;
+use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\MeasurementUnitController;
 use App\Http\Controllers\OfficeController;
-use App\Services\HrisClientService;
-use App\Http\Controllers\InventoryReportController;
 use App\Http\Controllers\OtherItServiceRequestController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PositionController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SolutionController;
+use App\Http\Controllers\TicketController;
+use App\Http\Controllers\UserController;
+use App\Http\Middleware\AuthGates;
+use App\Http\Resources\UserResource;
+use App\Services\HrisClientService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->get('/hris/debug/employees', function (HrisClientService $hris) {
-    $data = $hris->getEmployees();
+/*
+|--------------------------------------------------------------------------
+| Development-only debug routes
+|--------------------------------------------------------------------------
+*/
 
-    return response()->json([
-        'count' => count($data),
-        'keys' => array_keys($data[0] ?? []),
-        'sample' => $data[0] ?? null,
+// Route::middleware([
+//     'auth:sanctum',
+//     AuthGates::class,
+//     'can:employees.view',
+// ])->get('hris/debug/employees', function (HrisClientService $hris) {
+//     $data = $hris->getEmployees();
+//
+//     return response()->json([
+//         'count' => count($data),
+//         'keys' => array_keys($data[0] ?? []),
+//         'sample' => $data[0] ?? null,
+//     ]);
+// });
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated application routes
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    AuthGates::class,
+])->group(function () {
+    /*
+    |--------------------------------------------------------------------------
+    | Authenticated user
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('user', function (Request $request) {
+        return UserResource::make($request->user());
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Resource routes
+    |--------------------------------------------------------------------------
+    |
+    | Each controller method should also authorize its operation:
+    | index/view/store/update/destroy.
+    |
+    */
+
+    Route::apiResource('users', UserController::class);
+    Route::apiResource('departments', DepartmentController::class);
+    Route::apiResource('permissions', PermissionController::class);
+    Route::apiResource('roles', RoleController::class);
+    Route::apiResource('positions', PositionController::class);
+
+    Route::apiResource('employees', EmployeeController::class)
+        ->only(['index', 'show']);
+
+    Route::apiResource('brands', BrandController::class);
+    Route::apiResource('brand-models', BrandModelController::class);
+    Route::apiResource('item-types', ItemTypeController::class);
+    Route::apiResource('common-problems', CommonProblemController::class);
+    Route::apiResource('inventories', InventoryController::class);
+    Route::apiResource('it-services', ItServiceController::class);
+    Route::apiResource('tickets', TicketController::class);
+    Route::apiResource('solutions', SolutionController::class);
+    Route::apiResource('agencies', AgencyController::class);
+    Route::apiResource('measurement-units', MeasurementUnitController::class);
+    Route::apiResource('it-supplies', ItSupplyController::class);
+    Route::apiResource(
+        'other-it-service-requests',
+        OtherItServiceRequestController::class
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lookup/select routes
+    |--------------------------------------------------------------------------
+    |
+    | These are separate from administration/list permissions.
+    | Example: a user may select an item type while editing inventory
+    | without being allowed to manage item types.
+    */
+
+    Route::prefix('lookups')->group(function () {
+        Route::get('roles', [
+            RoleController::class,
+            'select',
+        ])->middleware('can:roles.select');
+
+        Route::get('departments', [
+            DepartmentController::class,
+            'select',
+        ])->middleware('can:departments.select');
+
+        Route::get('positions', [
+            PositionController::class,
+            'select',
+        ])->middleware('can:positions.select');
+
+        Route::get('brands', [
+            BrandController::class,
+            'select',
+        ])->middleware('can:brands.select');
+
+        Route::get('brand-models', [
+            BrandModelController::class,
+            'select',
+        ])->middleware('can:brand_models.select');
+
+        Route::get('item-types', [
+            ItemTypeController::class,
+            'select',
+        ])->middleware('can:item_types.select');
+
+        Route::get('it-services', [
+            ItServiceController::class,
+            'select',
+        ])->middleware('can:it_services.select');
+
+        Route::get('solutions', [
+            SolutionController::class,
+            'select',
+        ])->middleware('can:solutions.select');
+
+        Route::get('agencies', [
+            AgencyController::class,
+            'select',
+        ])->middleware('can:agencies.select');
+
+        Route::get('measurement-units', [
+            MeasurementUnitController::class,
+            'select',
+        ])->middleware('can:measurement_units.select');
+        
+        Route::get('offices', [
+            OfficeController::class,
+            'index',
+        ])->middleware('can:offices.view');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('search')->group(function () {
+        Route::get('employees', [
+            EmployeeController::class,
+            'search',
+        ])->middleware('can:employees.search');
+
+        Route::get('inventories', [
+            InventoryController::class,
+            'search',
+        ])->middleware('can:inventories.search');
+
+        Route::get('inventories/main-asset', [
+            InventoryController::class,
+            'searchMainAsset',
+        ])->middleware('can:inventories.search');
+
+        Route::get('agencies', [
+            AgencyController::class,
+            'search',
+        ])->middleware('can:agencies.search');
+
+        Route::get('it-supplies', [
+            ItSupplyController::class,
+            'search',
+        ])->middleware('can:it_supplies.search');
+
+        Route::get('brand-models', [
+            BrandModelController::class,
+            'search',
+        ])->middleware('can:brand_models.search');
+
+        Route::get('offices', [
+            OfficeController::class,
+            'search',
+        ])->middleware('can:offices.search');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Office routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('offices', [
+        OfficeController::class,
+        'index',
+    ])->middleware('can:offices.view');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Additional permission/role endpoints
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('permissions-all', [
+        PermissionController::class,
+        'permissionAll',
+    ])->middleware('can:permissions.view');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ticket actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('tickets/{ticket}')->group(function () {
+        Route::post('accept', [
+            TicketController::class,
+            'accept',
+        ])->middleware('can:tickets.accept');
+
+        Route::post('unaccept', [
+            TicketController::class,
+            'unaccept',
+        ])->middleware('can:tickets.unaccept');
+
+        Route::post('check-stock', [
+            TicketController::class,
+            'checkStock',
+        ])->middleware('can:tickets.check_stock');
+
+        Route::post('await-part', [
+            TicketController::class,
+            'awaitPart',
+        ])->middleware('can:tickets.await_part');
+
+        Route::post('resolve', [
+            TicketController::class,
+            'resolve',
+        ])->middleware('can:tickets.resolve');
+
+        Route::post('cancel', [
+            TicketController::class,
+            'cancel',
+        ])->middleware('can:tickets.cancel');
+
+        Route::post('reopen', [
+            TicketController::class,
+            'reopen',
+        ])->middleware('can:tickets.reopen');
+
+        Route::post('set-service-method', [
+            TicketController::class,
+            'setServiceMethod',
+        ])->middleware('can:tickets.set_service_method');
+
+        Route::post('set-release-date', [
+            TicketController::class,
+            'setReleaseDate',
+        ])->middleware('can:tickets.set_release_date');
+
+        Route::post('assess', [
+            TicketController::class,
+            'assess',
+        ])->middleware('can:tickets.assess');
+
+        Route::get('assessment-report', [
+            TicketController::class,
+            'assessmentReport',
+        ])->middleware('can:tickets.print_assessment');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reports
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('inventories/reports')->group(function () {
+        Route::get('excel', [
+            InventoryReportController::class,
+            'exportExcel',
+        ])->middleware('can:inventories.report');
+
+        Route::get('pdf', [
+            InventoryReportController::class,
+            'exportPdf',
+        ])->middleware('can:inventories.report');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Other IT service request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::post(
+        'other-it-service-requests/{otherItServiceRequest}/print',
+        [
+            OtherItServiceRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.other_it_services.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current-user heartbeat
+    |--------------------------------------------------------------------------
+    */
+
+    Route::put('me/heartbeat', [
+        ProfileController::class,
+        'updateStatus',
     ]);
-});
 
-// routes/api.php — temporary, remove after
-Route::get('/hris/debug/offices', function (HrisClientService $hris) {
-    $data = $hris->getOffices();
-    return response()->json([
-        'count'  => count($data),
-        'keys'   => array_keys($data[0] ?? []),
-        'sample' => array_slice($data, 0, 2),
+    Route::put('me/stop-heartbeat', [
+        ProfileController::class,
+        'setStatusOffline',
     ]);
-});
 
-Route::group(['middleware' => ['auth:sanctum', AuthGates::class]], function () {
-  Route::get('user', function (Request $request) {
-    return UserResource::make($request->user());
-  });
+    /*
+    |--------------------------------------------------------------------------
+    | Enum/reference endpoints
+    |--------------------------------------------------------------------------
+    */
 
-  Route::apiResource('users', UserController::class);
-
-  Route::apiResource('departments', DepartmentController::class);
-
-  Route::apiResource('permissions', PermissionController::class);
-
-  Route::apiResource('roles', RoleController::class);
-
-  Route::apiResource('positions', PositionController::class);
-
-  Route::apiResource('employees', EmployeeController::class)->only(['index', 'show']); // Only allow index and show, not create, update, or delete
-
-  Route::apiResource('brands', BrandController::class);
-
-  Route::apiResource('brand-models', BrandModelController::class);
-
-  Route::apiResource('item-types', ItemTypeController::class);
-
-  Route::apiResource('common-problems', CommonProblemController::class);
-
-  Route::apiResource('inventories', InventoryController::class); 
-
-  Route::apiResource('it-services', ItServiceController::class);
-
-  Route::apiResource('tickets', TicketController::class);
-
-  Route::apiResource('solutions', SolutionController::class);
-
-  Route::apiResource('agencies', AgencyController::class);
-
-  Route::apiResource('measurement-units', MeasurementUnitController::class);
-
-  Route::apiResource('it-supplies', ItSupplyController::class);
-
-  Route::get('offices', [OfficeController::class, 'index']);
-  Route::get('offices-search', [OfficeController::class, 'search']);
-
-  // Custom Routes
-
-  Route::get('permissions-all', [PermissionController::class, 'permissionAll']);
-
-  Route::get('roles-select', [RoleController::class, 'select']);
-
-  Route::get('departments-select', [DepartmentController::class, 'select']);
-  
-  Route::get('positions-select', [PositionController::class, 'select']);
-
-  Route::get('brands-select', [BrandController::class, 'select']);
-
-  Route::get('brand-models-select', [BrandModelController::class, 'select']);
-
-  Route::get('item-types-select', [ItemTypeController::class, 'select']);
-
-  Route::get('it-services-select', [ItServiceController::class, 'select']);
-
-  Route::get('solutions-select', [SolutionController::class, 'select']);
-
-  Route::get('agencies-select', [AgencyController::class, 'select']);
-
-  Route::get('measurement-units-select', [MeasurementUnitController::class, 'select']);
-
-  // Ticket Actions
-
-  Route::post('tickets/{ticket}/accept', [TicketController::class, 'accept']);
-  Route::post('tickets/{ticket}/unaccept', [TicketController::class, 'unaccept']);
-  Route::post('tickets/{ticket}/check-stock', [TicketController::class, 'checkStock']);
-  Route::post('tickets/{ticket}/await-part', [TicketController::class, 'awaitPart']);
-  Route::post('tickets/{ticket}/resolve', [TicketController::class, 'resolve']);
-  Route::post('tickets/{ticket}/cancel', [TicketController::class, 'cancel']);
-  Route::post('tickets/{ticket}/reopen', [TicketController::class, 'reopen']);
-  Route::post('tickets/{ticket}/set-service-method', [TicketController::class, 'setServiceMethod']);
-  Route::post('tickets/{ticket}/set-release-date', [TicketController::class, 'setReleaseDate']);
-  Route::post('tickets/{ticket}/assess', [TicketController::class, 'assess']);
-  Route::get('tickets/{ticket}/assessment-report', [TicketController::class, 'assessmentReport']);
-  
-
-  // Search Routes
-
-  Route::get('employees-search', [EmployeeController::class, 'search']);
-
-  Route::get('inventories-search', [InventoryController::class, 'search']);
-
-  Route::get('agencies-search', [AgencyController::class, 'search']);
-
-  Route::get('it-supplies-search', [ItSupplyController::class, 'search']);
-
-  Route::get('brand-models-search', [BrandModelController::class, 'search']);
-
-  Route::get('inventories-main-asset-search', [InventoryController::class, 'searchMainAsset']);
-
-  // Reports
-
-  // Inventories
-  Route::get('/inventories/reports/excel', [InventoryReportController::class, 'exportExcel']);
-  Route::get('/inventories/reports/pdf', [InventoryReportController::class, 'exportPdf']);
-
-  // Requests
-  // ----- Other IT Service Requests ---- //
-  Route::apiResource('other-it-service-requests', OtherItServiceRequestController::class);
-  Route::get(
-      'other-it-service-requests/{otherItServiceRequest}/print',
-      [OtherItServiceRequestController::class, 'print']
-  );
-
-  // Heartbeat Routes
-
-  Route::put('/me/heartbeat', [ProfileController::class, 'updateStatus']);
-  Route::put('/me/stop-heartbeat', [ProfileController::class, 'setStatusOffline']);
-
-  // Enums
-
-  Route::get('/query-statuses', fn () =>
-    collect(TicketStatus::cases())
-      ->map(fn ($status) => [
-          'value' => $status->value,
-          'label' => str_replace('_', ' ', ucfirst($status->name)),
-      ])
-  );
+    Route::get('query-statuses', function () {
+        return collect(TicketStatus::cases())
+            ->map(fn (TicketStatus $status) => [
+                'value' => $status->value,
+                'label' => str_replace(
+                    '_',
+                    ' ',
+                    ucfirst($status->name)
+                ),
+            ]);
+    })->middleware('can:tickets.view');
 });
