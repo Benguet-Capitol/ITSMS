@@ -5,6 +5,8 @@ namespace App\Observers;
 use App\Models\Ticket;
 use App\Models\Profile;
 use App\Enums\TicketStatus;
+use App\Models\User;
+use App\Notifications\TicketCreatedNotification;
 
 class TicketObserver
 {
@@ -28,6 +30,19 @@ class TicketObserver
      */
     public function created(Ticket $ticket): void
     {
+      $technicians = User::whereHas('roles', fn($q) => $q->where('title', 'IT Technical'))
+        ->with('profile.profileOffices', 'profile.agencies')
+        ->get();
+
+      foreach ($technicians as $user) {
+          $isPriorityMatch = $user->profile && (
+              $user->profile->profileOffices->contains('office_id', $ticket->office_id) ||
+              $user->profile->agencies->contains('id', $ticket->agency_id)
+          );
+
+          $user->notify(new TicketCreatedNotification($ticket, $isPriorityMatch));
+      }
+
       foreach ($ticket->personnel as $profile) {
           $this->syncProfileEngagement($profile);
       }

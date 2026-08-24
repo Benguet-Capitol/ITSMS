@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use App\Services\PdfImageService;
+use App\Notifications\TicketPersonnelJoinedNotification;
 
 class TicketController extends Controller
 {
@@ -217,6 +218,32 @@ class TicketController extends Controller
       return new TicketResource($ticket);
     }
 
+    public function show(Ticket $ticket) {
+        Gate::authorize('tickets.view');
+
+        $profileId = Auth::user()->profile->id;
+
+        $ticket = Ticket::query()
+            ->with([
+                'profile',
+                'inventory.parent_component',
+                'itService',
+                'personnel',
+                'item_type',
+                'solution',
+                'agency',
+                'assessment',
+            ])
+            ->withCount([
+                'personnel as personnel_count',
+
+                'personnel as accepted_by_me' => fn ($query) => $query->where('profile_id', $profileId),
+            ])
+            ->findOrFail($ticket->id);
+
+        return TicketResource::make($ticket);
+    }
+
     public function destroy(Ticket $ticket) {
       Gate::authorize('tickets.delete');
 
@@ -248,11 +275,21 @@ class TicketController extends Controller
 
         ProfileEngagementService::syncTicket($ticket);
 
+        $existingPersonnel = $ticket->personnel()
+          ->where('profile_id', '!=', $request->user()->profile->id)
+          ->get();
+
+        if ($existingPersonnel->isNotEmpty()) {
+            $joinedProfile = $request->user()->profile;
+            foreach ($existingPersonnel as $profile) {
+                $profile->user->notify(new TicketPersonnelJoinedNotification($ticket, $joinedProfile));
+            }
+        }
+
         return new TicketResource($ticket);
     }
 
-    public function unaccept(Request $request, Ticket $ticket)
-    {
+    public function unaccept(Request $request, Ticket $ticket) {
         Gate::authorize('tickets.update');
 
         $profile = Auth::user()->profile;

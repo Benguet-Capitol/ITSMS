@@ -1,0 +1,1 @@
+import{aT as a,E as t,ar as s}from"./c2P9zZ51.js";const u=a(i=>{const e=i.meta.permission;if(!e)return;const r=t();if(!r.value)return s("/login",{replace:!0});if(!(r.value.permissions?.[e]===!0))return s("/unauthorized",{replace:!0})});export{u as default};
