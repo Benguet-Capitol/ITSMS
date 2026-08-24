@@ -78,7 +78,7 @@ class ItServiceController extends Controller
     }
 
     public function select() {
-      Gate::authorize('it_services.view');
+      Gate::authorize('it_services.select');
       
       $itServices = ItService::all();
 

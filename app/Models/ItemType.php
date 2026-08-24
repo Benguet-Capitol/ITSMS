@@ -12,7 +12,14 @@ class ItemType extends Model
         'purpose',
         'is_main_inventory',
         'is_component',
+        'supports_internal_components',
         'part_number',
         'status',
+    ];
+
+    protected $casts = [
+        'is_main_inventory' => 'boolean',
+        'is_component' => 'boolean',
+        'supports_internal_components' => 'boolean',
     ];
 }

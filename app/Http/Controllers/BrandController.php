@@ -72,7 +72,7 @@ class BrandController extends Controller
     }
 
     public function select() {
-      Gate::authorize('brands.view');
+      Gate::authorize('brands.select');
       
       $brands = Brand::all();
 

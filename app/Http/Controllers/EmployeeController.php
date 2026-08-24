@@ -91,7 +91,7 @@ class EmployeeController extends Controller
     }
 
     public function search(Request $request, HrisClientService $hris) {
-      Gate::authorize('employees.view');
+      Gate::authorize('employees.search');
       
       $q     = trim((string) $request->input('q', ''));
       $limit = (int) $request->input('limit', 20);

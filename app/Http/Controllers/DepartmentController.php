@@ -75,7 +75,7 @@ class DepartmentController extends Controller
     }
 
     public function select() {
-      Gate::authorize('departments.view');
+      Gate::authorize('departments.select');
       
       $departments = Department::all();
 

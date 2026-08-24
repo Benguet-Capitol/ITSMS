@@ -76,7 +76,7 @@ class ItemTypeController extends Controller
     }
 
     public function select() {
-      Gate::authorize('item_types.view');
+      Gate::authorize('item_types.select');
       
       $item_types = ItemType::all();
 

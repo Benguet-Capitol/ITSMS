@@ -13,6 +13,7 @@ class TicketAssessment extends Model
         'replacement_available',
         'specifications',
         'acquisition_cost',
+        'is_set',
         'components',
         'reviewed_by',
         'assessed_by',
@@ -24,6 +25,7 @@ class TicketAssessment extends Model
         'components'             => 'array',
         'replacement_available'  => 'boolean',
         'acquisition_cost'       => 'decimal:2',
+        'is_set' => 'boolean',
     ];
 
     public function ticket() {

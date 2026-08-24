@@ -404,46 +404,72 @@ class TicketController extends Controller
 
     public function assessmentReport(Ticket $ticket, HrisClientService $hris, PdfImageService $pdfImages) {
         Gate::authorize('tickets.view');
+
         $ticket->load([
             'assessment',
+
             'inventory',
             'inventory.item_type',
             'inventory.brand_model',
             'inventory.brand_model.item_type',
             'inventory.brand_model.brand',
+
+            'inventory.internal_components',
+            'inventory.internal_components.brand_model',
+            'inventory.internal_components.brand_model.brand',
+
             'inventory.parent_component',
             'inventory.parent_component.item_type',
             'inventory.parent_component.brand_model',
             'inventory.parent_component.brand_model.item_type',
             'inventory.parent_component.brand_model.brand',
+
+            'inventory.parent_component.internal_components',
+            'inventory.parent_component.internal_components.brand_model',
+            'inventory.parent_component.internal_components.brand_model.brand',
+
             'item_type',
             'profile',
             'agency',
         ]);
 
         if (!$ticket->assessment) {
-            return response()->json(['message' => 'No assessment found for this ticket.'], 404);
+            return response()->json([
+                'message' => 'No assessment found for this ticket.',
+            ], 404);
         }
 
-        // Resolve employee from HRIS
+        // Resolve employee from HRIS.
         $employeeMap = collect($hris->getEmployeesCached())
-            ->filter(fn ($e) => isset($e['id']))
-            ->keyBy(fn ($e) => (int) $e['id']);
+            ->filter(fn ($employee) => isset($employee['id']))
+            ->keyBy(fn ($employee) => (int) $employee['id']);
 
-        // Employee is on the inventory (not directly on ticket)
-        $employeeId = $ticket->inventory?->employee_id ?? $ticket->employee_id ?? null;
+        $inventory = $ticket->inventory;
+        $parentInventory = $inventory?->parent_component;
+
+        // When the ticket inventory is a child component, use its parent
+        // as the primary source for inventory-level details.
+        $resolvedInventory = $parentInventory ?? $inventory;
+
+        $employeeId = $inventory?->employee_id
+            ?? $parentInventory?->employee_id
+            ?? $ticket->employee_id
+            ?? null;
+
         $employee = $employeeMap->get((int) $employeeId);
 
-        $resolvedInventory = $ticket->inventory?->inventory ?? $ticket->inventory;
-        
         $office = $ticket->is_other_agency
             ? ($ticket->agency?->name ?? $ticket->agency?->abbreviation ?? '—')
             : (
                 $ticket->office_desc
-                    ? "{$ticket->office_desc}" . ($ticket->office_code ? " ({$ticket->office_code})" : '')
+                    ? $ticket->office_desc
+                        . ($ticket->office_code ? " ({$ticket->office_code})" : '')
                     : (
                         $resolvedInventory?->office_name
-                            ? "{$resolvedInventory->office_name}" . ($resolvedInventory?->office_code ? " ({$resolvedInventory->office_code})" : '')
+                            ? $resolvedInventory->office_name
+                                . ($resolvedInventory->office_code
+                                    ? " ({$resolvedInventory->office_code})"
+                                    : '')
                             : (data_get($employee, 'office_desc') ?? '—')
                     )
             );
@@ -454,72 +480,162 @@ class TicketController extends Controller
             ?? $ticket->full_name
             ?? '—';
 
-        $brandModelSource = $ticket->inventory?->brand_model ?? $ticket->inventory?->parent_component?->brand_model;
+        /*
+        |--------------------------------------------------------------------------
+        | Model / Description
+        |--------------------------------------------------------------------------
+        |
+        | System Unit (1), Laptop (164), and System Unit-Server (170)
+        | use all attached internal-component brand models.
+        |
+        */
+
+        $itemTypeId = $resolvedInventory?->item_type_id
+            ?? $inventory?->item_type_id
+            ?? $ticket->item_type_id
+            ?? null;
+
+        $componentBasedItemTypes = [1, 164, 170];
 
         $brandModel = null;
 
-        if ($brandModelSource) {
-            $modelName = $brandModelSource->name ?? null;
-            $specification = $brandModelSource->specification ?? null;
-            $brandName = $brandModelSource->brand?->name ?? null;
+        if (
+            in_array((int) $itemTypeId, $componentBasedItemTypes, true)
+            && $resolvedInventory
+        ) {
+            $componentDescriptions = $resolvedInventory->internal_components
+                ->map(function ($component) {
+                    $componentBrandModel = $component->brand_model;
 
-            $parts = array_filter(
-                [$modelName, $specification, $brandName],
-                fn ($value) => $value !== null && $value !== ''
-            );
+                    if (!$componentBrandModel) {
+                        return null;
+                    }
 
-            $brandModel = !empty($parts) ? implode(', ', $parts) : null;
+                    $parts = array_filter([
+                        $componentBrandModel->brand?->name,
+                        $componentBrandModel->name,
+                        $componentBrandModel->specification,
+                    ], fn ($value) => filled($value));
+
+                    return !empty($parts)
+                        ? implode(' ', $parts)
+                        : null;
+                })
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($componentDescriptions->isNotEmpty()) {
+                $brandModel = $componentDescriptions->implode(', ');
+            }
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Standard inventory brand-model fallback
+        |--------------------------------------------------------------------------
+        */
 
         if (!$brandModel) {
-            $fallbackModel = $ticket->inventory?->model ?? null;
-            $fallbackSpecification = $ticket->inventory?->specification
-                ?? $ticket->inventory?->description
-                ?? null;
-            $fallbackBrand = $ticket->inventory?->brand?->name
-                ?? $ticket->inventory?->brand_name
-                ?? null;
+            $brandModelSource = $resolvedInventory?->brand_model
+                ?? $inventory?->brand_model
+                ?? $parentInventory?->brand_model;
 
-            $parts = array_filter(
-                [$fallbackModel, $fallbackSpecification, $fallbackBrand],
-                fn ($value) => $value !== null && $value !== ''
-            );
+            if ($brandModelSource) {
+                $parts = array_filter([
+                    $brandModelSource->brand?->name,
+                    $brandModelSource->name,
+                    $brandModelSource->specification,
+                ], fn ($value) => filled($value));
 
-            $brandModel = !empty($parts) ? implode(', ', $parts) : null;
+                $brandModel = !empty($parts)
+                    ? implode(' ', $parts)
+                    : null;
+            }
         }
 
-        // Item type — prefer inventory, fall back to ticket
-        $itemType = $ticket->inventory?->item_type?->type
-          ?? $ticket->inventory?->parent_component?->item_type?->type
-          ?? $ticket->item_type?->type
-          ?? '—';
+        /*
+        |--------------------------------------------------------------------------
+        | Legacy/direct-field fallback
+        |--------------------------------------------------------------------------
+        */
+
+        if (!$brandModel) {
+            $parts = array_filter([
+                $resolvedInventory?->brand?->name
+                    ?? $resolvedInventory?->brand_name,
+                $resolvedInventory?->model,
+                $resolvedInventory?->specification
+                    ?? $resolvedInventory?->description,
+            ], fn ($value) => filled($value));
+
+            $brandModel = !empty($parts)
+                ? implode(' ', $parts)
+                : null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Inline acquisition flag
+        |--------------------------------------------------------------------------
+        */
+
+        if ($ticket->assessment->is_set) {
+            $brandModel = ($brandModel ?: '—') . ' (Set)';
+        }
+
+        // Item type — inventory first, then parent, then ticket.
+        $itemType = $inventory?->item_type?->type
+            ?? $parentInventory?->item_type?->type
+            ?? $ticket->item_type?->type
+            ?? '—';
 
         $dateAcquired = $resolvedInventory?->date_acquired
-            ? \Carbon\Carbon::parse($resolvedInventory->date_acquired)->format('F d, Y')
+            ? \Carbon\Carbon::parse($resolvedInventory->date_acquired)
+                ->format('F d, Y')
             : '—';
 
         $data = [
-            'ticket'       => $ticket,
-            'assessment'   => $ticket->assessment,
-            'date'         => now()->format('F d, Y'),
-            'control_no'   => $ticket->ticket_number,
-            'office'       => $office,
-            'item_name'    => $itemType,
-            'property_no'  => $ticket->inventory?->property_number ?? '—',
+            'ticket'        => $ticket,
+            'assessment'    => $ticket->assessment,
+            'date' => $ticket->assessment->created_at?->format('F d, Y') ?? '—',
+            'control_no'    => $ticket->ticket_number,
+            'office'        => $office,
+            'item_name'     => $itemType,
+            'property_no'   => $inventory?->property_number
+                ?? $parentInventory?->property_number
+                ?? '—',
             'date_acquired' => $dateAcquired,
-            'issued_to'    => $issuedTo,
-            'brand_model'  => $brandModel ?? '—',
-            'serial_number'=> $ticket->inventory?->serial_number ?? '—',
-            'concern'      => $ticket->concern,
-            'components'   => $ticket->assessment->components ?? [],
+            'issued_to'     => $issuedTo,
+            'brand_model'   => $brandModel ?? '—',
+            'serial_number' => $inventory?->serial_number
+                ?? $parentInventory?->serial_number
+                ?? '—',
+            'concern'       => $ticket->concern,
+            'components'    => $ticket->assessment->components ?? [],
             'system_unit_parts' => [
-                'PROCESSOR', 'RAM/ Memory Module', 'SOLID STATE DRIVE',
-                'HARD DISK', 'VIDEO CARD', 'POWER SUPPLY',
-                'MOTHERBOARD', 'OPTICAL DRIVE', 'MONITOR', 'OTHERS',
+                'PROCESSOR',
+                'RAM/ Memory Module',
+                'SOLID STATE DRIVE',
+                'HARD DISK',
+                'VIDEO CARD',
+                'POWER SUPPLY',
+                'MOTHERBOARD',
+                'OPTICAL DRIVE',
+                'MONITOR',
+                'OTHERS',
             ],
             'peripherals' => [
-                'KEYBOARD', 'MOUSE', 'SPEAKER', 'USB/FLASHDRIVE',
-                'AVR', 'UPS', 'PRINTER', 'SCANNER', 'Router / Switch', 'OTHERS',
+                'KEYBOARD',
+                'MOUSE',
+                'SPEAKER',
+                'USB/FLASHDRIVE',
+                'AVR',
+                'UPS',
+                'PRINTER',
+                'SCANNER',
+                'Router / Switch',
+                'OTHERS',
             ],
             ...$pdfImages->agencyLogos(),
         ];
@@ -527,7 +643,11 @@ class TicketController extends Controller
         $pdf = Pdf::loadView('reports.ticket-assessment', $data)
             ->setPaper('a4', 'portrait');
 
-        $filename = 'Assessment-' . $ticket->ticket_number . '-' . now()->format('Y-m-d_Hi') . '.pdf';
+        $filename = 'Assessment-'
+            . $ticket->ticket_number
+            . '-'
+            . now()->format('Y-m-d_Hi')
+            . '.pdf';
 
         return $pdf->download($filename, [
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',

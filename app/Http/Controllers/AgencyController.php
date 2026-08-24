@@ -72,29 +72,46 @@ class AgencyController extends Controller
     }
 
     public function select() {
-      Gate::authorize('agencies.view');
-      
-      $agencies = Agency::all();
+        Gate::authorize('agencies.select');
 
-      return response()->json([
-        'data' => AgencyResource::collection($agencies)
-      ]);
+        $agencies = Agency::query()->orderBy('abbreviation')->get();
+
+        return response()->json([
+            'data' => AgencyResource::collection($agencies),
+        ]);
     }
 
     public function search(Request $request) {
-      Gate::authorize('agencies.view');
+      Gate::authorize('agencies.search');
       
-      $query = $request->input('q');
-      $limit = (int) $request->input('limit', 20);
-      $page = (int) $request->input('page', 1);
-      $offset = ($page - 1) * $limit;
+      $query = trim(
+          $request->string('q')->toString()
+      );
+
+      $limit = min(
+          max($request->integer('limit', 20), 1),
+          100
+      );
+
+      $page = max(
+          $request->integer('page', 1),
+          1
+      );
 
       $agencies = Agency::query()
-          ->when($query, fn($qBuilder) =>
-              $qBuilder->where('name', 'like', "%$query%")->orWhere('abbreviation', 'like', "%$query%")
-          )
-          ->offset($offset)
-          ->limit($limit)
+          ->when($query !== '', function ($builder) use ($query) {
+              $builder->where(function ($builder) use ($query) {
+                  $builder
+                      ->where('name', 'like', "%{$query}%")
+                      ->orWhere(
+                          'abbreviation',
+                          'like',
+                          "%{$query}%"
+                      );
+              });
+          })
+          ->orderBy('abbreviation')
+          ->forPage($page, $limit)
           ->get();
 
       return response()->json([

@@ -82,7 +82,7 @@ class RoleController extends Controller
     }
 
     public function select() {
-        Gate::authorize('roles.view');
+        Gate::authorize('roles.select');
         // ?? Member no active membership
         $roles = Role::all();
         // $members = Member::with('memberships')->whereDoesntHave('memberships', function ($query) {

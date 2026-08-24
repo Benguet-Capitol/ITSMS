@@ -92,7 +92,7 @@ class BrandModelController extends Controller
     // }
 
     public function search(Request $request) {
-      Gate::authorize('brand_models.view');
+      Gate::authorize('brand_models.search');
       
       $query = $request->input('q');
       $item_type_id = $request->input('item_type_id');

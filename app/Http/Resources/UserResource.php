@@ -14,7 +14,7 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $user_roles_permissions = $this?->loadMissing([
+        $this->loadMissing([
             'roles.permissions',
             'profile.profileOffices',
             'profile.agencies',
@@ -22,46 +22,43 @@ class UserResource extends JsonResource
 
         $permissions = [];
         $roles = [];
-        $agencies_assigned = [];
-        $agencies_assigned_ids = [];
-        $offices_agencies_assigned = [];
+        $agenciesAssigned = [];
+        $agenciesAssignedIds = [];
+        $officesAgenciesAssigned = [];
 
-        if ($user_roles_permissions) {
-            foreach ($user_roles_permissions->roles as $role) {
-                $roles[] = [
-                    'id' => $role->id,
-                    'title' => $role->title,
-                ];
+        foreach ($this->roles as $role) {
+            $roles[] = [
+                'id' => $role->id,
+                'title' => $role->title,
+            ];
 
-                foreach ($role->permissions as $singlePermission) {
-                    $permissions[] = $singlePermission->title;
-                }
-            }
-
-            if ($user_roles_permissions->profile) {
-                foreach ($user_roles_permissions->profile->agencies as $agency) {
-                    $agencies_assigned[] = [
-                        'id' => $agency->id,
-                        'abbreviation' => $agency->abbreviation,
-                    ];
-
-                    $offices_agencies_assigned[] = [
-                        'id' => $agency->id,
-                        'abbreviation' => $agency->abbreviation,
-                    ];
-
-                    $agencies_assigned_ids[] = $agency->id;
-                }
+            foreach ($role->permissions as $permission) {
+                $permissions[$permission->title] = true;
             }
         }
 
-        $offices_assigned = $this->profile?->offices_assigned ?? [];
-        $offices_assigned_ids = $this->profile?->office_ids ?? [];
+        if ($this->profile) {
+            foreach ($this->profile->agencies as $agency) {
+                $agencyData = [
+                    'id' => $agency->id,
+                    'abbreviation' => $agency->abbreviation,
+                ];
 
-        foreach ($offices_assigned as $office) {
-            $offices_agencies_assigned[] = [
+                $agenciesAssigned[] = $agencyData;
+                $officesAgenciesAssigned[] = $agencyData;
+                $agenciesAssignedIds[] = $agency->id;
+            }
+        }
+
+        $officesAssigned = $this->profile?->offices_assigned ?? [];
+        $officesAssignedIds = $this->profile?->office_ids ?? [];
+
+        foreach ($officesAssigned as $office) {
+            $officesAgenciesAssigned[] = [
                 'id' => $office['id'],
-                'abbreviation' => $office['abbreviation'] ?? $office['office_code'] ?? null,
+                'abbreviation' => $office['abbreviation']
+                    ?? $office['office_code']
+                    ?? null,
             ];
         }
 
@@ -69,19 +66,19 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'username' => $this->username,
             'email' => $this->email,
-            'profile' => new ProfileResource($this->whenLoaded('profile')),
+            'profile' => new ProfileResource(
+                $this->whenLoaded('profile')
+            ),
             'created_at' => $this->created_at,
             'roles' => $roles,
-            'permissions' => collect($permissions)->unique()->map(function ($permission) {
-                return [
-                    $permission => true
-                ];
-            })->collapse()->toArray(),
-            'offices_assigned' => $offices_assigned,
-            'agencies_assigned' => $agencies_assigned,
-            'offices_assigned_ids' => $offices_assigned_ids,
-            'agencies_assigned_ids' => $agencies_assigned_ids,
-            'offices_agencies_assigned' => $offices_agencies_assigned,
+            'permissions' => $permissions,
+            'offices_assigned' => $officesAssigned,
+            'agencies_assigned' => $agenciesAssigned,
+            'offices_assigned_ids' => $officesAssignedIds,
+            'agencies_assigned_ids' => array_values(
+                array_unique($agenciesAssignedIds)
+            ),
+            'offices_agencies_assigned' => $officesAgenciesAssigned,
         ];
     }
 }

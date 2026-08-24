@@ -40,14 +40,25 @@ class InventoryResource extends JsonResource
         $computed_brand_model_search = $this->computed_brand_model_search;
 
         $employeeMap = $request->attributes->get('employeeMap');
-        $employee = $employeeMap?->get((int) $this->employee_id);
 
-        $employee_full_name = data_get($employee, 'fullname') ?: $this->employee_full_name;
+        $effectiveEmployeeId = $this->employee_id;
+
+        if (!$effectiveEmployeeId) {
+            $effectiveEmployeeId = $this->parent_component?->employee_id;
+        }
+
+        $employee = $employeeMap?->get((int) $effectiveEmployeeId);
+
+        $employee_full_name =
+            data_get($employee, 'fullname')
+            ?: data_get($employee, 'full_name')
+            ?: $this->employee_full_name
+            ?: '';
 
         return [
             'id' => $this->id,
 
-            'employee_id' => $this->employee_id,
+            'employee_id' => $effectiveEmployeeId,
 
             'employee' => $employee,
             'brand_model' => BrandModelResource::make($this->whenLoaded('brand_model')),

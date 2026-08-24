@@ -77,13 +77,37 @@ class SolutionController extends Controller
       return new SolutionResource($solution);
     }
 
-    public function select() {
-      Gate::authorize('solutions.view');
-      
-      $solutions = Solution::latest()->get();
+    public function select(Request $request) {
+        Gate::authorize('solutions.select');
 
-      return response()->json([
-        'data' => SolutionResource::collection($solutions)
-      ]);
+        $solutions = Solution::query()
+            ->when(
+                $request->filled('search'),
+                function ($query) use ($request) {
+                    $search = $request->string('search');
+
+                    $query->where(function ($query) use ($search) {
+                        $query
+                            ->where('title', 'like', "%{$search}%")
+                            ->orWhere(
+                                'description',
+                                'like',
+                                "%{$search}%"
+                            )
+                            ->orWhere(
+                                'error_code',
+                                'like',
+                                "%{$search}%"
+                            );
+                    });
+                }
+            )
+            ->latest()
+            ->limit($request->integer('limit', 50))
+            ->get();
+
+        return response()->json([
+            'data' => SolutionResource::collection($solutions),
+        ]);
     }
 }

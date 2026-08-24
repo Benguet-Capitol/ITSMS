@@ -74,7 +74,7 @@ class PositionController extends Controller
     }
 
     public function select() {
-      Gate::authorize('positions.view');
+      Gate::authorize('positions.select');
       
       $positions = Position::all();
 

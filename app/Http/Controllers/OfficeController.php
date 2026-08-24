@@ -11,81 +11,130 @@ use Illuminate\Support\Facades\Gate;
 class OfficeController extends Controller
 {
     public function index(Request $request, HrisClientService $hris) {
-      Gate::authorize('offices.view');
-      
-      $offices = collect($hris->getOfficesCached(minutes: 30));
+        Gate::authorize('offices.view');
 
-      if ($request->filled('search')) {
-          $search = mb_strtolower($request->input('search'));
+        $offices = collect(
+            $hris->getOfficesCached(minutes: 30)
+        );
 
-          $offices = $offices->filter(function ($office) use ($search) {
-              $haystack = mb_strtolower(implode(' ', array_filter([
-                  $office['office_code'] ?? '',
-                  $office['office_desc'] ?? '',
-              ])));
+        if ($request->filled('search')) {
+            $search = mb_strtolower(
+                trim($request->string('search')->toString())
+            );
 
-              return str_contains($haystack, $search);
-          })->values();
-      }
+            if ($search !== '') {
+                $offices = $offices
+                    ->filter(function ($office) use ($search) {
+                        $haystack = mb_strtolower(
+                            implode(' ', array_filter([
+                                $office['office_code'] ?? '',
+                                $office['office_desc'] ?? '',
+                            ]))
+                        );
 
-      $sort = $request->input('sort', 'office_code');
-      $order = strtolower($request->input('order', 'asc')) === 'desc' ? 'desc' : 'asc';
+                        return str_contains($haystack, $search);
+                    })
+                    ->values();
+            }
+        }
 
-      $sortKeyMap = [
-          'office_code' => 'office_code',
-          'office_desc' => 'office_desc',
-          'code' => 'office_code',
-          'name' => 'office_desc',
-          'created_at' => 'created_at',
-          'updated_at' => 'updated_at',
-      ];
+        $sort = $request->input(
+            'sort',
+            'office_code'
+        );
 
-      $hrisKey = $sortKeyMap[$sort] ?? 'office_code';
+        $order = strtolower(
+            $request->input('order', 'asc')
+        ) === 'desc'
+            ? 'desc'
+            : 'asc';
 
-      $offices = $offices->sortBy(
-          fn ($office) => $office[$hrisKey] ?? null,
-          SORT_REGULAR,
-          $order === 'desc'
-      )->values();
+        $sortKeyMap = [
+            'office_code' => 'office_code',
+            'office_desc' => 'office_desc',
+            'code' => 'office_code',
+            'name' => 'office_desc',
+        ];
 
-      $perPage = (int) $request->input('per_page', 5);
-      $page = (int) $request->input('page', 1);
-      $total = $offices->count();
-      $items = $offices->slice(($page - 1) * $perPage, $perPage)->values();
+        $hrisKey = $sortKeyMap[$sort] ?? 'office_code';
 
-      $paginator = new LengthAwarePaginator(
-          $items,
-          $total,
-          $perPage,
-          $page,
-          ['path' => $request->url(), 'query' => $request->query()]
-      );
+        $offices = $offices
+            ->sortBy(
+                fn ($office) => mb_strtolower(
+                    (string) ($office[$hrisKey] ?? '')
+                ),
+                SORT_STRING,
+                $order === 'desc'
+            )
+            ->values();
 
-      return response()->json([
-          'data' => OfficeResource::collection($paginator->getCollection()),
-          'meta' => [
-              'total' => $paginator->total(),
-              'per_page' => $paginator->perPage(),
-              'current_page' => $paginator->currentPage(),
-              'last_page' => $paginator->lastPage(),
-          ],
-      ]);
+        $perPage = min(
+            max($request->integer('per_page', 5), 1),
+            100
+        );
+
+        $page = max(
+            $request->integer('page', 1),
+            1
+        );
+
+        $total = $offices->count();
+
+        $items = $offices
+            ->slice(($page - 1) * $perPage, $perPage)
+            ->values();
+
+        $paginator = new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        return response()->json([
+            'data' => OfficeResource::collection(
+                $paginator->getCollection()
+            ),
+            'meta' => [
+                'total' => $paginator->total(),
+                'per_page' => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+            ],
+        ]);
     }
 
     public function search(Request $request, HrisClientService $hris) {
-        Gate::authorize('offices.view');
+        Gate::authorize('offices.search');
 
-        $q = trim((string) $request->input('q', ''));
-        $limit = (int) $request->input('limit', 20);
+        $query = trim(
+            $request->string('q')->toString()
+        );
 
-        if (mb_strlen($q) < 1) {
-            return response()->json(['data' => []]);
+        $limit = min(
+            max($request->integer('limit', 20), 1),
+            100
+        );
+
+        if ($query === '') {
+            return response()->json([
+                'data' => [],
+            ]);
         }
 
-        $rows = $hris->searchOffices($q, $limit);
+        $rows = $hris->searchOffices(
+            $query,
+            $limit
+        );
 
         return response()->json([
-            'data' => OfficeResource::collection(collect($rows)->values()),
+            'data' => OfficeResource::collection(
+                collect($rows)->values()
+            ),
         ]);
     }
 }

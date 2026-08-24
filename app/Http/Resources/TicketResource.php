@@ -122,6 +122,7 @@ class TicketResource extends JsonResource
               'replacement_available' => $this->assessment->replacement_available,
               'specifications'        => $this->assessment->specifications,
               'acquisition_cost'      => $this->assessment->acquisition_cost,
+              'is_set'                => $this->assessment->is_set,
               'components'            => $this->assessment->components,
               'reviewed_by'           => $this->assessment->reviewed_by,
               'assessed_by'           => $this->assessment->assessed_by,

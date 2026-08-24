@@ -85,7 +85,7 @@ class ItSupplyController extends Controller
     }
 
     public function select() {
-      Gate::authorize('it_supplies.view');
+      Gate::authorize('it_supplies.select');
       
       $itSupplies = ItSupply::all();
 
@@ -95,7 +95,7 @@ class ItSupplyController extends Controller
     }
 
     public function search(Request $request) {
-      Gate::authorize('it_supplies.view');
+      Gate::authorize('it_supplies.search');
       
       $query = $request->input('q');
       $limit = (int) $request->input('limit', 20);

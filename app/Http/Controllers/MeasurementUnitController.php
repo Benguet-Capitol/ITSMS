@@ -74,7 +74,7 @@ class MeasurementUnitController extends Controller
     }
 
     public function select() {
-      Gate::authorize('measurement_units.view');
+      Gate::authorize('measurement_units.select');
       
       $measurementUnits = MeasurementUnit::all();
 
