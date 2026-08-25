@@ -522,25 +522,22 @@ class TicketController extends Controller
         | Model / Description
         |--------------------------------------------------------------------------
         |
-        | System Unit (1), Laptop (164), and System Unit-Server (170)
-        | use all attached internal-component brand models.
+        | Only when the TICKET'S OWN inventory item's item_type has
+        | supports_internal_components = true do we build the description
+        | from its internal components. Everything else (UPS, Monitor,
+        | Printer, etc.) uses its own brand_model directly, even if it
+        | happens to be a child/parent component.
         |
         */
 
-        $itemTypeId = $resolvedInventory?->item_type_id
-            ?? $inventory?->item_type_id
-            ?? $ticket->item_type_id
-            ?? null;
+        $itemType = $inventory?->item_type ?? $ticket->item_type;
 
-        $componentBasedItemTypes = [1, 164, 170];
+        $usesInternalComponents = (bool) ($itemType?->supports_internal_components ?? false);
 
         $brandModel = null;
 
-        if (
-            in_array((int) $itemTypeId, $componentBasedItemTypes, true)
-            && $resolvedInventory
-        ) {
-            $componentDescriptions = $resolvedInventory->internal_components
+        if ($usesInternalComponents && $inventory) {
+            $componentDescriptions = $inventory->internal_components
                 ->map(function ($component) {
                     $componentBrandModel = $component->brand_model;
 
@@ -569,13 +566,12 @@ class TicketController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Standard inventory brand-model fallback
+        | Standard inventory brand-model (covers UPS and everything else)
         |--------------------------------------------------------------------------
         */
 
         if (!$brandModel) {
-            $brandModelSource = $resolvedInventory?->brand_model
-                ?? $inventory?->brand_model
+            $brandModelSource = $inventory?->brand_model
                 ?? $parentInventory?->brand_model;
 
             if ($brandModelSource) {
@@ -598,17 +594,29 @@ class TicketController extends Controller
         */
 
         if (!$brandModel) {
+            $fallbackSource = $inventory ?? $parentInventory;
+
             $parts = array_filter([
-                $resolvedInventory?->brand?->name
-                    ?? $resolvedInventory?->brand_name,
-                $resolvedInventory?->model,
-                $resolvedInventory?->specification
-                    ?? $resolvedInventory?->description,
+                $fallbackSource?->brand?->name
+                    ?? $fallbackSource?->brand_name,
+                $fallbackSource?->model,
+                $fallbackSource?->specification
+                    ?? $fallbackSource?->description,
             ], fn ($value) => filled($value));
 
             $brandModel = !empty($parts)
                 ? implode(' ', $parts)
                 : null;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Inline acquisition flag
+        |--------------------------------------------------------------------------
+        */
+
+        if ($ticket->assessment->is_set) {
+            $brandModel = ($brandModel ?: '—') . ' (Set)';
         }
 
         /*
