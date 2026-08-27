@@ -698,4 +698,37 @@ class TicketController extends Controller
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
+
+    /**
+     * Return high-level ticket metrics for the dashboard.
+     */
+    public function dashboardSummary()
+    {
+        Gate::authorize('tickets.view');
+
+        $openStatuses = [
+            TicketStatus::Open->value,
+            TicketStatus::Reopened->value,
+        ];
+
+        return response()->json([
+            'open_tickets' => Ticket::query()
+                ->whereIn('request_status', $openStatuses)
+                ->count(),
+
+            'unassigned_tickets' => Ticket::query()
+                ->whereIn('request_status', $openStatuses)
+                ->doesntHave('personnel')
+                ->count(),
+
+            'awaiting_parts' => Ticket::query()
+                ->where('query_status', TicketStatus::AwaitingPart->value)
+                ->count(),
+
+            'resolved_today' => Ticket::query()
+                ->where('query_status', TicketStatus::Resolved->value)
+                ->whereDate('updated_at', today())
+                ->count(),
+        ]);
+    }
 }

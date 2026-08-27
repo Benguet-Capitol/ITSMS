@@ -24,21 +24,25 @@ class UsersMarkOffline extends Command
     /**
      * Execute the console command.
      */
-    public function handle()
+    public function handle(): int
     {
         $threshold = now()->subMinutes(2);
-        // $threshold = now()->subSeconds(5);
 
-        $affected = Profile::where('status', [
-                Profile::STATUS_ONLINE,
-            ])
-            ->where('last_seen_at', '<', $threshold)
-            ->update([
-                'status' => Profile::STATUS_OFFLINE,
-                'updated_at' => now(),
-            ]);
+        $affected = Profile::query()
+          ->whereIn('status', [
+              Profile::STATUS_ONLINE,
+              Profile::STATUS_BUSY,
+          ])
+          ->whereNotNull('last_seen_at')
+          ->where('last_seen_at', '<', $threshold)
+          ->update([
+              'status' => Profile::STATUS_OFFLINE,
+              'engagement' => null,
+              'updated_at' => now(),
+          ]);
 
-        $this->info("✅ Marked {$affected} users offline.");
+        $this->info("Marked {$affected} inactive users offline.");
+
         return Command::SUCCESS;
     }
 }

@@ -26,6 +26,7 @@ class Profile extends Model
 
     const STATUS_ONLINE = 'online';
     const STATUS_OFFLINE = 'offline';
+    const STATUS_BUSY = 'busy';
 
     const ENGAGEMENT_READY = 'ready';
     const ENGAGEMENT_BUSY = 'busy';

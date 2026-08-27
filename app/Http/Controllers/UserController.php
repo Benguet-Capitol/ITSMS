@@ -13,6 +13,7 @@ use App\Http\Requests\StoreUserRequest;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\ProfileOffice;
+use Carbon\Carbon;
 
 class UserController extends Controller
 {
@@ -200,5 +201,93 @@ class UserController extends Controller
         if (!empty($rows)) {
             ProfileOffice::insert($rows);
         }
+    }
+
+    /**
+     * Handle user heartbeat to update profile's last_seen_at timestamp.
+     * This is called periodically by the frontend to indicate the user is still active.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\Response
+     */
+    public function heartbeat(Request $request)
+    {
+        $user = $request->user();
+        
+        // Update the user's profile last_seen_at timestamp
+        $user->profile->update([
+            'last_seen_at' => now(),
+        ]);
+
+        // Return 204 No Content - minimal response, no body needed
+        return response()->noContent();
+    }
+
+    /**
+     * Get all users with their online/offline/busy status.
+     * Includes profile data, roles, and departments for display.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function onlineList()
+    {
+        $users = User::with([
+            'profile',
+            'roles',
+            'profile.departments',
+        ])
+            ->get()
+            ->map(function ($user) {
+                $profile = $user->profile;
+
+                $lastSeenAt = $profile?->last_seen_at
+                    ? Carbon::parse($profile->last_seen_at)
+                    : null;
+
+                // $isRecentlyActive = $lastSeenAt
+                //     && $lastSeenAt->greaterThanOrEqualTo($cutoff);
+
+                // $status = $isRecentlyActive
+                //     ? ($profile->status ?: Profile::STATUS_ONLINE)
+                //     : Profile::STATUS_OFFLINE;
+
+                return [
+                  'id' => $user->id,
+                  'email' => $user->email,
+                  'username' => $user->username,
+                  'display_name' => $profile?->display_name,
+                  'designation' => $profile?->designation,
+
+                  // Use the profile value maintained by the heartbeat endpoints.
+                  'status' => $profile?->status ?? Profile::STATUS_OFFLINE,
+
+                  'status_text' => $profile?->status_text,
+                  'last_seen_at' => $profile?->last_seen_at,
+
+                  'last_seen_at_humanized' => $lastSeenAt
+                      ? $lastSeenAt->diffForHumans()
+                      : null,
+
+                  'roles' => $user->roles->map(fn ($role) => [
+                      'id' => $role->id,
+                      'title' => $role->title,
+                  ])->values(),
+
+                  'departments' => $profile?->departments
+                      ? $profile->departments->map(fn ($department) => [
+                          'id' => $department->id,
+                          'name' => $department->name,
+                      ])->values()
+                      : [],
+
+                  'img_path' => $profile?->img_path
+                      ? asset("storage/{$profile->img_path}")
+                      : null,
+              ];
+            })
+            ->sortBy(fn ($user) => $user['display_name'] ?? $user['email'])
+            ->values();
+
+        return response()->json($users);
     }
 }

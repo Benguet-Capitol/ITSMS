@@ -8,30 +8,37 @@ use App\Models\Profile;
 class ProfileController extends Controller
 {
     public function updateStatus(Request $request) {
-        $user = auth('sanctum')->user();
+        $user = $request->user();
 
-        if ($user && $user->profile) {
-            $user->profile->update([
-                'status' => Profile::STATUS_ONLINE,
-                'last_seen_at' => now(),
-            ]);
+        if (!$user || !$user->profile) {
+            return response()->json([
+                'message' => 'User profile not found.',
+            ], 404);
         }
 
-        return response()->json(['message' => 'Heartbeat updated']);
+        $user->profile->update([
+            'status' => Profile::STATUS_ONLINE,
+            'last_seen_at' => now(),
+        ]);
+
+        return response()->noContent();
     }
 
-    public function setStatusOffline(Request $request) {
-        $user = auth('sanctum')->user();
+    public function setStatusOffline(Request $request)
+    {
+        $user = $request->user();
 
-        if ($user && $user->profile) {
-            $user->profile->update([
-                'status' => Profile::STATUS_OFFLINE,
-                'engagement' => null, // 🔑 clear BUSY engagement
-                'last_seen_at' => now(),
-            ]);
-            return response()->json(['message' => 'Status set to offline.']);
+        if (! $user || ! $user->profile) {
+            return response()->json([
+                'message' => 'Authenticated user profile not found.',
+            ], 404);
         }
 
-        return response()->noContent(); // 204 if no user
+        $user->profile->update([
+            'status' => Profile::STATUS_OFFLINE,
+            'engagement' => null,
+        ]);
+
+        return response()->noContent();
     }
 }
