@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,17 +19,18 @@ class UpdateAgencyRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', 'unique:agencies,name,' . $this->agency->id],
-            'abbreviation' => ['nullable', 'string', 'max:255', 'unique:agencies,abbreviation,' . $this->agency->id],
+            'name' => ['required', 'string', 'max:255', 'unique:agencies,name,'.$this->agency->id],
+            'abbreviation' => ['nullable', 'string', 'max:255', 'unique:agencies,abbreviation,'.$this->agency->id],
         ];
     }
 
-    public function attributes(): array {
+    public function attributes(): array
+    {
         return [
             'name' => 'Agency Name',
             'abbreviation' => 'Agency Abbreviation',

@@ -7,20 +7,21 @@ use App\Http\Requests\UpdateInventoryRequest;
 use App\Http\Resources\InventoryResource;
 use App\Models\Inventory;
 use App\Models\InventoryInternalComponent;
-use App\Models\ItemType;
 use App\Services\HrisClientService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class InventoryController extends Controller
 {
-    public function index(Request $request, HrisClientService $hris) {
+    public function index(Request $request, HrisClientService $hris)
+    {
         Gate::authorize('inventories.view');
 
-        $search   = trim((string) $request->input('search', ''));
-        $tab      = (string) $request->input('tab', 'all');
-        $perPage  = (int) $request->input('per_page', 10);
-        $page     = (int) $request->input('page', 1);
+        $search = trim((string) $request->input('search', ''));
+        $tab = (string) $request->input('tab', 'all');
+        $perPage = (int) $request->input('per_page', 10);
+        $page = (int) $request->input('page', 1);
         $officeId = $request->input('office_id');
 
         $baseQuery = Inventory::query();
@@ -36,16 +37,16 @@ class InventoryController extends Controller
                     ->all();
 
                 $baseQuery->where(function ($q) use ($search, $ids) {
-                    if (!empty($ids)) {
+                    if (! empty($ids)) {
                         $q->whereIn('employee_id', $ids)
-                          ->orWhereHas('parent_component', function ($q2) use ($ids) {
-                              $q2->whereIn('employee_id', $ids);
-                          });
+                            ->orWhereHas('parent_component', function ($q2) use ($ids) {
+                                $q2->whereIn('employee_id', $ids);
+                            });
                     }
 
                     $q->orWhere('property_number', 'like', "%{$search}%")
-                      ->orWhere('serial_number', 'like', "%{$search}%")
-                      ->orWhere('ip_address', 'like', "%{$search}%");
+                        ->orWhere('serial_number', 'like', "%{$search}%")
+                        ->orWhere('ip_address', 'like', "%{$search}%");
 
                     $q->orWhereHas('item_type', function ($q2) use ($search) {
                         $q2->where('type', 'like', "%{$search}%");
@@ -62,8 +63,8 @@ class InventoryController extends Controller
             } else {
                 $baseQuery->where(function ($q) use ($search) {
                     $q->where('property_number', 'like', "%{$search}%")
-                      ->orWhere('ip_address', 'like', "%{$search}%")
-                      ->orWhere('serial_number', 'like', "%{$search}%");
+                        ->orWhere('ip_address', 'like', "%{$search}%")
+                        ->orWhere('serial_number', 'like', "%{$search}%");
                 });
             }
         }
@@ -74,9 +75,9 @@ class InventoryController extends Controller
 
             $baseQuery->where(function ($q) use ($officeId) {
                 $q->where('office_id', $officeId)
-                  ->orWhereHas('parent_component', function ($q2) use ($officeId) {
-                      $q2->where('office_id', $officeId);
-                  });
+                    ->orWhereHas('parent_component', function ($q2) use ($officeId) {
+                        $q2->where('office_id', $officeId);
+                    });
             });
         }
 
@@ -89,9 +90,9 @@ class InventoryController extends Controller
 
             $baseQuery->where(function ($q) use ($divisionId) {
                 $q->where('division_id', $divisionId)
-                  ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
-                      $q2->where('division_id', $divisionId);
-                  });
+                    ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
+                        $q2->where('division_id', $divisionId);
+                    });
             });
         }
 
@@ -99,8 +100,8 @@ class InventoryController extends Controller
         $query = clone $baseQuery;
         match ($tab) {
             'parent_components' => $query->whereNull('parent_component_id'),
-            'child_components'  => $query->whereNotNull('parent_component_id'),
-            default             => null,
+            'child_components' => $query->whereNotNull('parent_component_id'),
+            default => null,
         };
 
         if ($request->filled('sort')) {
@@ -121,149 +122,159 @@ class InventoryController extends Controller
 
         // ── Counts ───────────────────────────────────────────────────────────────
         $counts = [
-            'all'               => (clone $baseQuery)->count(),
+            'all' => (clone $baseQuery)->count(),
             'parent_components' => (clone $baseQuery)->whereNull('parent_component_id')->count(),
-            'child_components'  => (clone $baseQuery)->whereNotNull('parent_component_id')->count(),
+            'child_components' => (clone $baseQuery)->whereNotNull('parent_component_id')->count(),
         ];
 
         return response()->json([
             'data' => InventoryResource::collection($inventories),
             'meta' => [
-                'total'        => $inventories->total(),
-                'per_page'     => $inventories->perPage(),
+                'total' => $inventories->total(),
+                'per_page' => $inventories->perPage(),
                 'current_page' => $inventories->currentPage(),
-                'last_page'    => $inventories->lastPage(),
-                'counts'       => $counts,
+                'last_page' => $inventories->lastPage(),
+                'counts' => $counts,
             ],
         ]);
     }
 
-    public function store(StoreInventoryRequest $request) {
+    public function store(StoreInventoryRequest $request)
+    {
         Gate::authorize('inventories.create');
 
         $data = $request->validated();
-
-        $inventory = Inventory::create($data);
-
-        $itemType = ItemType::find($data['item_type_id']);
+        $itemType = $request->resolvedItemType();
 
         $isMainInventory = (bool) $itemType?->is_main_inventory;
         $isComponent = (bool) $itemType?->is_component;
-        $hasParent = !empty($data['parent_component_id']);
+        $hasParent = ! empty($data['parent_component_id']);
 
         $isStandaloneMainInventory =
             $isMainInventory &&
-            (!$isComponent || !$hasParent);
+            (! $isComponent || ! $hasParent);
 
-        if ($isStandaloneMainInventory) {
-            foreach ($data['internal_components'] ?? [] as $component) {
-                InventoryInternalComponent::create([
-                    'inventory_id' => $inventory->id,
-                    'brand_model_id' => $component['brand_model']['id'],
-                    'quantity' => $component['quantity'],
-                    'specific_serial_number' =>
-                        $component['specific_serial_number'] ?? null,
-                    'slot' => $component['slot'] ?? null,
-                    'notes' => $component['notes'] ?? null,
-                ]);
+        $inventory = DB::transaction(function () use ($data, $isStandaloneMainInventory) {
+            $inventory = Inventory::create($data);
+
+            if ($isStandaloneMainInventory) {
+                foreach ($data['internal_components'] ?? [] as $component) {
+                    InventoryInternalComponent::create([
+                        'inventory_id' => $inventory->id,
+                        'brand_model_id' => $component['brand_model']['id'],
+                        'quantity' => $component['quantity'],
+                        'specific_serial_number' => $component['specific_serial_number'] ?? null,
+                        'slot' => $component['slot'] ?? null,
+                        'notes' => $component['notes'] ?? null,
+                    ]);
+                }
             }
-        }
+
+            return $inventory;
+        });
 
         $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
 
-        return new InventoryResource($inventory);
+        return new InventoryResource(
+            $inventory->refresh()->load(['brand_model', 'item_type', 'parent_component', 'internal_components.brand_model'])
+        );
     }
 
-    public function update(UpdateInventoryRequest $request, Inventory $inventory) {
+    public function update(UpdateInventoryRequest $request, Inventory $inventory)
+    {
         Gate::authorize('inventories.update');
 
         $data = $request->validated();
+        $itemType = $request->resolvedItemType();
 
         $officeChanged =
             $inventory->office_id !== ($data['office_id'] ?? null) ||
             $inventory->office_code !== ($data['office_code'] ?? null) ||
             $inventory->office_name !== ($data['office_name'] ?? null);
 
-        $inventory->update($data);
-
-        $itemType = ItemType::find($inventory->item_type_id);
-
         $isMainInventory = (bool) $itemType?->is_main_inventory;
         $isComponent = (bool) $itemType?->is_component;
-        $hasParent = !empty($data['parent_component_id']);
+        $hasParent = ! empty($data['parent_component_id']);
 
         $isStandaloneMainInventory =
             $isMainInventory &&
-            (!$isComponent || !$hasParent);
+            (! $isComponent || ! $hasParent);
 
-        if ($officeChanged && $isStandaloneMainInventory) {
-            Inventory::where('parent_component_id', $inventory->id)
-                ->update([
-                    'office_id' => $inventory->office_id,
-                    'office_code' => $inventory->office_code,
-                    'office_name' => $inventory->office_name,
-                    'division_id' => $inventory->division_id,
-                    'division_name' => $inventory->division_name,
-                ]);
-        }
+        DB::transaction(function () use ($inventory, $data, $officeChanged, $isStandaloneMainInventory) {
+            $inventory->update($data);
 
-        if ($isStandaloneMainInventory) {
-            $newComponents = $data['internal_components'] ?? [];
-
-            $existingIds = $inventory->internal_components()->pluck('id')->toArray();
-
-            $incomingIds = collect($newComponents)
-                ->pluck('id')
-                ->filter()
-                ->toArray();
-
-            $toDelete = array_diff($existingIds, $incomingIds);
-            InventoryInternalComponent::whereIn('id', $toDelete)->delete();
-
-            foreach ($newComponents as $component) {
-                $componentData = [
-                    'brand_model_id' => data_get($component, 'brand_model.id'),
-                    'quantity' => $component['quantity'] ?? 1,
-                    'specific_serial_number' =>
-                        $component['specific_serial_number'] ?? null,
-                    'slot' => $component['slot'] ?? null,
-                    'notes' => $component['notes'] ?? null,
-                ];
-
-                if (
-                    isset($component['id']) &&
-                    in_array($component['id'], $existingIds, true)
-                ) {
-                    $existingComponent = InventoryInternalComponent::find(
-                        $component['id']
-                    );
-
-                    $existingComponent?->update($componentData);
-                } else {
-                    InventoryInternalComponent::create([
-                        'inventory_id' => $inventory->id,
-                        ...$componentData,
+            if ($officeChanged && $isStandaloneMainInventory) {
+                Inventory::where('parent_component_id', $inventory->id)
+                    ->update([
+                        'office_id' => $inventory->office_id,
+                        'office_code' => $inventory->office_code,
+                        'office_name' => $inventory->office_name,
+                        'division_id' => $inventory->division_id,
+                        'division_name' => $inventory->division_name,
                     ]);
-                }
             }
-        } else {
-            $inventory->internal_components()->delete();
-        }
+
+            if ($isStandaloneMainInventory) {
+                $newComponents = $data['internal_components'] ?? [];
+
+                $existingIds = $inventory->internal_components()->pluck('id')->toArray();
+
+                $incomingIds = collect($newComponents)
+                    ->pluck('id')
+                    ->filter()
+                    ->toArray();
+
+                $toDelete = array_diff($existingIds, $incomingIds);
+                InventoryInternalComponent::whereIn('id', $toDelete)->delete();
+
+                foreach ($newComponents as $component) {
+                    $componentData = [
+                        'brand_model_id' => data_get($component, 'brand_model.id'),
+                        'quantity' => $component['quantity'] ?? 1,
+                        'specific_serial_number' => $component['specific_serial_number'] ?? null,
+                        'slot' => $component['slot'] ?? null,
+                        'notes' => $component['notes'] ?? null,
+                    ];
+
+                    if (
+                        isset($component['id']) &&
+                        in_array($component['id'], $existingIds, true)
+                    ) {
+                        $existingComponent = InventoryInternalComponent::find(
+                            $component['id']
+                        );
+
+                        $existingComponent?->update($componentData);
+                    } else {
+                        InventoryInternalComponent::create([
+                            'inventory_id' => $inventory->id,
+                            ...$componentData,
+                        ]);
+                    }
+                }
+            } else {
+                $inventory->internal_components()->delete();
+            }
+        });
 
         $this->injectEmployeeMap($request, $inventory->employee_id, app(HrisClientService::class));
+
+        return new InventoryResource(
+            $inventory->refresh()->load(['brand_model', 'item_type', 'parent_component', 'internal_components.brand_model'])
+        );
+    }
+
+    public function destroy(Inventory $inventory)
+    {
+        Gate::authorize('inventories.delete');
+
+        $inventory->delete();
 
         return new InventoryResource($inventory);
     }
 
-    public function destroy(Inventory $inventory) {
-      Gate::authorize('inventories.delete');
-
-      $inventory->delete();
-      
-      return new InventoryResource($inventory);
-    }
-
-    public function search(Request $request, HrisClientService $hris) {
+    public function search(Request $request, HrisClientService $hris)
+    {
         Gate::authorize('inventories.search');
 
         $query = trim((string) $request->input('q', ''));
@@ -282,13 +293,13 @@ class InventoryController extends Controller
 
                 $qBuilder->where(function ($q) use ($query, $employeeIds) {
                     $q->where('property_number', 'like', "%{$query}%")
-                      ->orWhere('serial_number', 'like', "%{$query}%");
+                        ->orWhere('serial_number', 'like', "%{$query}%");
 
-                    if (!empty($employeeIds)) {
+                    if (! empty($employeeIds)) {
                         $q->orWhereIn('employee_id', $employeeIds)
-                          ->orWhereHas('parent_component', function ($parentQuery) use ($employeeIds) {
-                              $parentQuery->whereIn('employee_id', $employeeIds);
-                          });
+                            ->orWhereHas('parent_component', function ($parentQuery) use ($employeeIds) {
+                                $parentQuery->whereIn('employee_id', $employeeIds);
+                            });
                     }
                 });
             })
@@ -313,7 +324,8 @@ class InventoryController extends Controller
         ]);
     }
 
-    public function searchMainAsset(Request $request) {
+    public function searchMainAsset(Request $request)
+    {
         Gate::authorize('inventories.view');
         $query = $request->input('q');
         $limit = (int) $request->input('limit', 20);
@@ -323,32 +335,33 @@ class InventoryController extends Controller
         $exclude_id = $request->input('exclude_id');
 
         $inventories = Inventory::query()
-          ->whereNull('parent_component_id')
-          ->when($query, function ($qBuilder) use ($query) {
-              $qBuilder->where('property_number', 'like', "%{$query}%");
-          })
-          ->whereHas('item_type', function ($q4) {
-              $q4->where('is_main_inventory', true);
-          })
-          ->when($exclude_id, function ($qBuilder) use ($exclude_id) {
-              $qBuilder->where('id', '!=', $exclude_id);
-          })
-          ->with([
-              'brand_model',
-              'item_type',
-              'parent_component',
-              'internal_components.brand_model',
-          ])
-          ->offset($offset)
-          ->limit($limit)
-          ->get(); 
+            ->whereNull('parent_component_id')
+            ->when($query, function ($qBuilder) use ($query) {
+                $qBuilder->where('property_number', 'like', "%{$query}%");
+            })
+            ->whereHas('item_type', function ($q4) {
+                $q4->where('is_main_inventory', true);
+            })
+            ->when($exclude_id, function ($qBuilder) use ($exclude_id) {
+                $qBuilder->where('id', '!=', $exclude_id);
+            })
+            ->with([
+                'brand_model',
+                'item_type',
+                'parent_component',
+                'internal_components.brand_model',
+            ])
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
 
         return response()->json([
             'data' => InventoryResource::collection($inventories),
         ]);
     }
 
-    private function injectEmployeeMap(Request $request, $employeeId, HrisClientService $hris): void {
+    private function injectEmployeeMap(Request $request, $employeeId, HrisClientService $hris): void
+    {
         $employeeMap = collect();
 
         if ($employeeId) {
@@ -363,7 +376,8 @@ class InventoryController extends Controller
         $request->attributes->set('employeeMap', $employeeMap);
     }
 
-    private function injectEmployeeMapFromInventories(Request $request, $inventories, HrisClientService $hris): void {
+    private function injectEmployeeMapFromInventories(Request $request, $inventories, HrisClientService $hris): void
+    {
         $employeeIds = collect($inventories)
             ->flatMap(function (Inventory $inventory) {
                 return [

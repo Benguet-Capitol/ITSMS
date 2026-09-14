@@ -2,136 +2,140 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Resources\EmployeeResource;
 use App\Services\HrisClientService;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 
 class EmployeeController extends Controller
 {
-    public function index(Request $request, HrisClientService $hris) {
-      Gate::authorize('employees.view');
-      
-      $employees = collect($hris->getEmployeesCached(minutes: 5));
+    public function index(Request $request, HrisClientService $hris)
+    {
+        Gate::authorize('employees.view');
 
-      // SEARCH
-      if ($request->filled('search')) {
-          $search = mb_strtolower($request->input('search'));
+        $employees = collect($hris->getEmployeesCached(minutes: 5));
 
-          $employees = $employees->filter(function ($e) use ($search) {
-              $haystack = mb_strtolower(implode(' ', array_filter([
-                  $e['employee_id_number'] ?? '',
-                  $e['fname']             ?? '',
-                  $e['mname']             ?? '',
-                  $e['lname']             ?? '',
-                  $e['office_desc']       ?? '',
-                  $e['position_title']    ?? '',
-                  $e['employee_type']     ?? '',
-              ])));
+        // SEARCH
+        if ($request->filled('search')) {
+            $search = mb_strtolower($request->input('search'));
 
-              return str_contains($haystack, $search);
-          })->values();
-      }
+            $employees = $employees->filter(function ($e) use ($search) {
+                $haystack = mb_strtolower(implode(' ', array_filter([
+                    $e['employee_id_number'] ?? '',
+                    $e['fname'] ?? '',
+                    $e['mname'] ?? '',
+                    $e['lname'] ?? '',
+                    $e['office_desc'] ?? '',
+                    $e['position_title'] ?? '',
+                    $e['employee_type'] ?? '',
+                ])));
 
-      // SORTING
-      $sort = $request->input('sort');
-      if ($sort) {
-          $order = strtolower($request->input('order', 'asc')) === 'desc' ? 'desc' : 'asc';
+                return str_contains($haystack, $search);
+            })->values();
+        }
 
-          $sortKeyMap = [
-              'fullname'       => 'fullname',
-              'fname'          => 'fname',
-              'mname'          => 'mname',
-              'lname'          => 'lname',
-              'office_desc'    => 'office_desc',
-              'office_code'    => 'office_code',
-              'position_title' => 'position_title',
-              'type'           => 'type',
-              'salary_grade_id'=> 'salary_grade_id',
-              'grade'          => 'grade',
-              'division'       => 'division',
-              'unit'           => 'unit',
-              'salary'         => 'salary',
-              // UI aliases
-              'firstname'      => 'fname',
-              'lastname'       => 'lname',
-          ];
+        // SORTING
+        $sort = $request->input('sort');
+        if ($sort) {
+            $order = strtolower($request->input('order', 'asc')) === 'desc' ? 'desc' : 'asc';
 
-          $hrisKey   = $sortKeyMap[$sort] ?? $sort;
-          $employees = $employees->sortBy(
-              fn($e) => $e[$hrisKey] ?? null,
-              SORT_REGULAR,
-              $order === 'desc'
-          )->values();
-      }
+            $sortKeyMap = [
+                'fullname' => 'fullname',
+                'fname' => 'fname',
+                'mname' => 'mname',
+                'lname' => 'lname',
+                'office_desc' => 'office_desc',
+                'office_code' => 'office_code',
+                'position_title' => 'position_title',
+                'type' => 'type',
+                'salary_grade_id' => 'salary_grade_id',
+                'grade' => 'grade',
+                'division' => 'division',
+                'unit' => 'unit',
+                'salary' => 'salary',
+                // UI aliases
+                'firstname' => 'fname',
+                'lastname' => 'lname',
+            ];
 
-      // PAGINATION
-      $perPage = (int) $request->input('per_page', 5);
-      $page    = (int) $request->input('page', 1);
-      $total   = $employees->count();
-      $items   = $employees->slice(($page - 1) * $perPage, $perPage)->values();
+            $hrisKey = $sortKeyMap[$sort] ?? $sort;
+            $employees = $employees->sortBy(
+                fn ($e) => $e[$hrisKey] ?? null,
+                SORT_REGULAR,
+                $order === 'desc'
+            )->values();
+        }
 
-      $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-          $items,
-          $total,
-          $perPage,
-          $page,
-          ['path' => $request->url(), 'query' => $request->query()]
-      );
+        // PAGINATION
+        $perPage = (int) $request->input('per_page', 5);
+        $page = (int) $request->input('page', 1);
+        $total = $employees->count();
+        $items = $employees->slice(($page - 1) * $perPage, $perPage)->values();
 
-      return response()->json([
-          'data' => EmployeeResource::collection($paginator->getCollection()),
-          'meta' => [
-              'total'        => $paginator->total(),
-              'per_page'     => $paginator->perPage(),
-              'current_page' => $paginator->currentPage(),
-              'last_page'    => $paginator->lastPage(),
-          ],
-      ]);
+        $paginator = new LengthAwarePaginator(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return response()->json([
+            'data' => EmployeeResource::collection($paginator->getCollection()),
+            'meta' => [
+                'total' => $paginator->total(),
+                'per_page' => $paginator->perPage(),
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+            ],
+        ]);
     }
 
-    public function search(Request $request, HrisClientService $hris) {
-      Gate::authorize('employees.search');
-      
-      $q     = trim((string) $request->input('q', ''));
-      $limit = (int) $request->input('limit', 20);
+    public function search(Request $request, HrisClientService $hris)
+    {
+        Gate::authorize('employees.search');
 
-      if (mb_strlen($q) < 2 && !$request->hasAny(['employee_id', 'office_id', 'type'])) {
-          return response()->json(['data' => []]);
-      }
+        $q = trim((string) $request->input('q', ''));
+        $limit = (int) $request->input('limit', 20);
 
-      $allowed = array_keys(config('hris.employee_filters', []));
-      $filters = $request->only($allowed);
+        if (mb_strlen($q) < 2 && ! $request->hasAny(['employee_id', 'office_id', 'type'])) {
+            return response()->json(['data' => []]);
+        }
 
-      if (!isset($filters['employee_id']) && preg_match('/^\d{6,}$/', $q)) {
-          $filters['employee_id'] = $q;
-      }
+        $allowed = array_keys(config('hris.employee_filters', []));
+        $filters = $request->only($allowed);
 
-      $rows = $hris->getEmployeesWithParams($filters);
-      $didUseEmployeeId = isset($filters['employee_id']) && $filters['employee_id'] === $q;
+        if (! isset($filters['employee_id']) && preg_match('/^\d{6,}$/', $q)) {
+            $filters['employee_id'] = $q;
+        }
 
-      if ($q !== '' && !$didUseEmployeeId) {
-          $needle = mb_strtolower($q);
-          $rows   = collect($rows)->filter(function ($e) use ($needle) {
-              $name = mb_strtolower($e['fullname'] ?? $e['full_name'] ?? '');
-              return $name !== '' && str_contains($name, $needle);
-          })->values()->all();
-      }
+        $rows = $hris->getEmployeesWithParams($filters);
+        $didUseEmployeeId = isset($filters['employee_id']) && $filters['employee_id'] === $q;
 
-      $data = collect($rows)
-          ->take($limit)
-          ->map(fn($e) => [
-              'id'                 => $e['id']                 ?? null,
-              'employee_id_number' => $e['employee_id_number'] ?? null,
-              'full_name'          => $e['fullname'] ?? $e['full_name'] ?? null,
-              'office_id'          => $e['office_id']          ?? null,
-              'office_code'        => $e['office_code']        ?? null,
-              'position_title'     => $e['position_title']     ?? null,
-              'type'               => $e['type']               ?? null,
-          ])
-          ->filter(fn($e) => $e['id'] && $e['employee_id_number'] && $e['full_name'])
-          ->values();
+        if ($q !== '' && ! $didUseEmployeeId) {
+            $needle = mb_strtolower($q);
+            $rows = collect($rows)->filter(function ($e) use ($needle) {
+                $name = mb_strtolower($e['fullname'] ?? $e['full_name'] ?? '');
 
-      return response()->json(['data' => $data]);
+                return $name !== '' && str_contains($name, $needle);
+            })->values()->all();
+        }
+
+        $data = collect($rows)
+            ->take($limit)
+            ->map(fn ($e) => [
+                'id' => $e['id'] ?? null,
+                'employee_id_number' => $e['employee_id_number'] ?? null,
+                'full_name' => $e['fullname'] ?? $e['full_name'] ?? null,
+                'office_id' => $e['office_id'] ?? null,
+                'office_code' => $e['office_code'] ?? null,
+                'position_title' => $e['position_title'] ?? null,
+                'type' => $e['type'] ?? null,
+            ])
+            ->filter(fn ($e) => $e['id'] && $e['employee_id_number'] && $e['full_name'])
+            ->values();
+
+        return response()->json(['data' => $data]);
     }
 }

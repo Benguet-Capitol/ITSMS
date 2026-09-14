@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ItSupply extends Model
 {
+    use HasFactory;
+
     protected $with = ['brand_model', 'measurement_unit'];
 
     protected $fillable = [
@@ -20,11 +23,13 @@ class ItSupply extends Model
         'quantity',
     ];
 
-    public function brand_model() {
-      return $this->belongsTo(BrandModel::class);
+    public function brand_model()
+    {
+        return $this->belongsTo(BrandModel::class);
     }
 
-    public function measurement_unit() {
-      return $this->belongsTo(MeasurementUnit::class);
+    public function measurement_unit()
+    {
+        return $this->belongsTo(MeasurementUnit::class);
     }
 }

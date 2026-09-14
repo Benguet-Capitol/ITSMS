@@ -4,13 +4,12 @@ namespace App\Exports;
 
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class InventoryReportSummarySheet implements
-    FromArray
+class InventoryReportSummarySheet implements FromArray
 {
     private array $summary;
 
@@ -57,18 +56,18 @@ class InventoryReportSummarySheet implements
     public function styles(Worksheet $sheet)
     {
         $summaryCount = count($this->summary);
-        $lastRow      = $summaryCount + 5; // title + spacer + header + rows + spacer + total
+        $lastRow = $summaryCount + 5; // title + spacer + header + rows + spacer + total
 
         // Title
         $sheet->mergeCells('A1:B1');
         $sheet->getStyle('A1')->applyFromArray([
             'font' => [
-                'bold'  => true,
-                'size'  => 13,
+                'bold' => true,
+                'size' => 13,
                 'color' => ['rgb' => '1E3A5F'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'DBEAFE'],
             ],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
@@ -78,19 +77,19 @@ class InventoryReportSummarySheet implements
         // Header row
         $sheet->getStyle('A3:B3')->applyFromArray([
             'font' => [
-                'bold'  => true,
-                'size'  => 10,
+                'bold' => true,
+                'size' => 10,
                 'color' => ['rgb' => 'FFFFFF'],
             ],
             'fill' => [
-                'fillType'   => Fill::FILL_SOLID,
+                'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => '1E3A5F'],
             ],
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
-                    'color'       => ['rgb' => '93C5FD'],
+                    'color' => ['rgb' => '93C5FD'],
                 ],
             ],
         ]);
@@ -98,11 +97,11 @@ class InventoryReportSummarySheet implements
         // Data rows
         if ($summaryCount > 0) {
             $sheet->getStyle("A4:B{$lastRow}")->applyFromArray([
-                'font'    => ['size' => 10],
+                'font' => ['size' => 10],
                 'borders' => [
                     'allBorders' => [
                         'borderStyle' => Border::BORDER_THIN,
-                        'color'       => ['rgb' => 'E2E8F0'],
+                        'color' => ['rgb' => 'E2E8F0'],
                     ],
                 ],
             ]);
@@ -115,11 +114,11 @@ class InventoryReportSummarySheet implements
             $totalRow = $lastRow;
             $sheet->getStyle("A{$totalRow}:B{$totalRow}")->applyFromArray([
                 'font' => [
-                    'bold'  => true,
+                    'bold' => true,
                     'color' => ['rgb' => '1E3A5F'],
                 ],
                 'fill' => [
-                    'fillType'   => Fill::FILL_SOLID,
+                    'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'DBEAFE'],
                 ],
             ]);

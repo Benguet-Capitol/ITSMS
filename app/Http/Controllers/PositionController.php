@@ -2,84 +2,89 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Position;
-use App\Http\Resources\PositionResource;
-use Illuminate\Http\Request;
 use App\Http\Requests\StorePositionRequest;
 use App\Http\Requests\UpdatePositionRequest;
+use App\Http\Resources\PositionResource;
+use App\Models\Position;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class PositionController extends Controller
 {
-    public function index(Request $request) {
-      Gate::authorize('positions.view');
+    public function index(Request $request)
+    {
+        Gate::authorize('positions.view');
 
-      $query = Position::query();
+        $query = Position::query();
 
-      if($request->has('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use($search) {
-          $q->where('name', 'LIKE', "%{$search}%")
-          ->orWhere('abbreviation', 'LIKE', "%{$search}%");
-        });
-      }
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('abbreviation', 'LIKE', "%{$search}%");
+            });
+        }
 
-      // Sorting (default to ID)
-      if ($request->has('sort')) {
-        $order = $request->input('order', 'asc');
-        $query->orderBy($request->sort, $order);
-      }
+        // Sorting (default to ID)
+        if ($request->has('sort')) {
+            $order = $request->input('order', 'asc');
+            $query->orderBy($request->sort, $order);
+        }
 
-      // Paginate with customizable per-page count
-      $positions = $query->paginate($request->input('per_page', 5))->appends($request->query());
+        // Paginate with customizable per-page count
+        $positions = $query->paginate($request->input('per_page', 5))->appends($request->query());
 
-      return response()->json([
-          'data' => PositionResource::collection($positions),
-          'meta' => [
-              'total' => $positions->total(),
-              'per_page' => $positions->perPage(),
-              'current_page' => $positions->currentPage(),
-              'last_page' => $positions->lastPage(),
-          ]
-      ]);
+        return response()->json([
+            'data' => PositionResource::collection($positions),
+            'meta' => [
+                'total' => $positions->total(),
+                'per_page' => $positions->perPage(),
+                'current_page' => $positions->currentPage(),
+                'last_page' => $positions->lastPage(),
+            ],
+        ]);
 
     }
 
-    public function store(StorePositionRequest $request) {
-      Gate::authorize('positions.create');
-      
-      $data = $request->validated();
+    public function store(StorePositionRequest $request)
+    {
+        Gate::authorize('positions.create');
 
-      $position = Position::create($data);
+        $data = $request->validated();
 
-      return new PositionResource($position);
+        $position = Position::create($data);
+
+        return new PositionResource($position);
     }
 
-    public function update(UpdatePositionRequest $request, Position $position) {
-      Gate::authorize('positions.update');
+    public function update(UpdatePositionRequest $request, Position $position)
+    {
+        Gate::authorize('positions.update');
 
-      $data = $request->validated();
+        $data = $request->validated();
 
-      $position->update($data);
+        $position->update($data);
 
-      return new PositionResource($position);
+        return new PositionResource($position);
     }
 
-    public function destroy(Position $position) {
-      Gate::authorize('positions.delete');
+    public function destroy(Position $position)
+    {
+        Gate::authorize('positions.delete');
 
-      $position->delete();
-      
-      return new PositionResource($position);
+        $position->delete();
+
+        return new PositionResource($position);
     }
 
-    public function select() {
-      Gate::authorize('positions.select');
-      
-      $positions = Position::all();
+    public function select()
+    {
+        Gate::authorize('positions.select');
 
-      return response()->json([
-        'data' => PositionResource::collection($positions)
-      ]);
+        $positions = Position::all();
+
+        return response()->json([
+            'data' => PositionResource::collection($positions),
+        ]);
     }
 }

@@ -22,16 +22,18 @@ class AssessTicketRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'findings'               => ['required', 'string'],
-            'recommendations'        => ['required', 'string'],
-            'reviewed_by'            => ['required', 'string', 'max:255'],
-            'reviewed_by_position'   => ['required', 'string', 'max:255'],
-            'replacement_available'  => ['required', 'boolean'],
-            'specifications'         => ['nullable', 'string'],
-            'acquisition_cost'       => 'nullable|numeric|min:0|max:999999999.99',
-            'is_set'                 => ['boolean'],
-            'components'             => ['nullable', 'array'],
-            'components.*'           => ['string'],
+            'findings' => ['required', 'string'],
+            'recommendations' => ['required', 'string'],
+            'reviewed_by' => ['required', 'string', 'max:255'],
+            'reviewed_by_position' => ['required', 'string', 'max:255'],
+            'replacement_available' => ['required', 'boolean'],
+            'specifications' => ['nullable', 'string'],
+            'acquisition_cost' => 'nullable|numeric|min:0|max:999999999.99',
+            'is_set' => ['boolean'],
+            'components' => ['nullable', 'array'],
+            'components.*' => ['string'],
+            'component_remarks' => ['nullable', 'array'],
+            'component_remarks.*' => ['nullable', 'string', 'max:255'],
             // 'assessed_by'            => ['required', 'string', 'max:255'],
             // 'assessed_by_position'   => ['required', 'string', 'max:255'],
         ];

@@ -220,7 +220,7 @@
             <td></td>
             <td>
                 <span class="label-muted">Acquisition Cost:</span>
-                <span style="font-family: 'DejaVu Sans', sans-serif;">&#8369;</span>{{ number_format($assessment->acquisition_cost, 2) }}
+                <span style="font-family: 'DejaVu Sans', sans-serif;">&#8369;</span>{{ number_format($assessment->acquisition_cost, 2) }}{{ $assessment->is_set ? ' (Set)' : '' }}
             </td>
         </tr>
     </table>
@@ -246,7 +246,7 @@
                 </span>
                 {{ $pair[0] }}
             </td>
-            <td style="width:15%"></td>
+            <td style="width:15%">{{ ($component_remarks ?? [])[$pair[0]] ?? '' }}</td>
             <td colspan="2" style="width:35%">
                 @if($pair[1])
                     @php $checked2 = in_array($pair[1], $components ?? []); @endphp
@@ -256,7 +256,41 @@
                     {{ $pair[1] }}
                 @endif
             </td>
-            <td style="width:15%"></td>
+            <td style="width:15%">{{ $pair[1] ? (($component_remarks ?? [])[$pair[1]] ?? '') : '' }}</td>
+        </tr>
+        @endforeach
+    </table>
+
+    {{-- COMPONENTS TABLE (LAPTOP / MOBILE) --}}
+    <table class="component-table" style="margin-top: -1px;">
+        <tr>
+            <td colspan="2" class="col-header" style="width:50%">LAPTOP</td>
+            <td class="col-header" style="width:15%">REMARKS</td>
+            <td colspan="2" class="col-header" style="width:35%">MOBILE</td>
+            <td class="col-header" style="width:15%">REMARKS</td>
+        </tr>
+        @foreach(array_map(null, $laptop_parts, $mobile_parts) as $pair)
+        <tr>
+            <td colspan="2" style="width:35%">
+                @if($pair[0])
+                    @php $checked = in_array($pair[0], $components ?? []); @endphp
+                    <span class="checkbox {{ $checked ? 'checked' : '' }}">
+                      <span style="font-family: 'DejaVu Sans', sans-serif;">{{ $checked ? '✔' : '' }}</span>
+                    </span>
+                    {{ $pair[0] }}
+                @endif
+            </td>
+            <td style="width:15%">{{ $pair[0] ? (($component_remarks ?? [])[$pair[0]] ?? '') : '' }}</td>
+            <td colspan="2" style="width:35%">
+                @if($pair[1])
+                    @php $checked2 = in_array($pair[1], $components ?? []); @endphp
+                    <span class="checkbox {{ $checked2 ? 'checked' : '' }}">
+                      <span style="font-family: 'DejaVu Sans', sans-serif;">{{ $checked2 ? '✔' : '' }}</span>
+                    </span>
+                    {{ $pair[1] }}
+                @endif
+            </td>
+            <td style="width:15%">{{ $pair[1] ? (($component_remarks ?? [])[$pair[1]] ?? '') : '' }}</td>
         </tr>
         @endforeach
     </table>

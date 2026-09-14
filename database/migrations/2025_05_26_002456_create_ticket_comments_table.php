@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('ticket_comments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('profile_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->text('comment');
             $table->timestamps();
         });

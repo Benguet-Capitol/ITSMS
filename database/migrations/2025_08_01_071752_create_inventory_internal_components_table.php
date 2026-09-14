@@ -17,11 +17,11 @@ return new class extends Migration
             // item_type_id is 'Desktop/CPU'
             $table->id();
             $table->foreignId('inventory_id')->nullable()
-              ->constrained('inventories')
-              ->cascadeOnDelete()->comment('Inventories where item_type_id is Desktop/CPU');
+                ->constrained('inventories')
+                ->cascadeOnDelete()->comment('Inventories where item_type_id is Desktop/CPU');
             $table->foreignId('brand_model_id')->nullable()
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->string('specific_serial_number')->nullable();
             $table->string('slot')->nullable();
             $table->integer('quantity')->default(1);

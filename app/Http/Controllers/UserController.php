@@ -2,160 +2,170 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
+use App\Http\Resources\UserResource;
+use App\Models\Profile;
+use App\Models\ProfileOffice;
 use App\Models\Role;
 use App\Models\User;
-use App\Models\Profile;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Http\Resources\UserResource;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
-use App\Http\Requests\StoreUserRequest;
 use Illuminate\Support\Facades\Storage;
-use App\Http\Requests\UpdateUserRequest;
-use App\Models\ProfileOffice;
-use Carbon\Carbon;
 
 class UserController extends Controller
 {
-    public function index(Request $request) {
-      Gate::authorize('users.view');
+    public function index(Request $request)
+    {
+        Gate::authorize('users.view');
 
-      $query = User::query();
+        $query = User::query();
 
-      // Search by name or email
-      if($request->has('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use($search) {
-          $q->where('username', 'LIKE', "%{$search}%")
-          ->orWhere('email', 'LIKE', "%{$search}%")
-          ->orWhereHas('profile', function ($q4) use($search) {
-                  $q4->where('display_name', 'like', "%$search%");
-                });
-        });
-      }
+        // Search by name or email
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('username', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhereHas('profile', function ($q4) use ($search) {
+                        $q4->where('display_name', 'like', "%$search%");
+                    });
+            });
+        }
 
-       // Status filter (active/inactive)
-      if ($request->has('status')) {
-        $query->where('status', $request->status);
-      }
+        // Status filter (active/inactive)
+        if ($request->filled('status') && in_array($request->status, ['active', 'inactive'], true)) {
+            $query->where('status', $request->status);
+        }
 
-      // Sorting (default to ID)
-      if ($request->has('sort')) {
-        $order = $request->input('order', 'asc');
-        $query->orderBy($request->sort, $order);
-      }
+        // Sorting (default to ID) -- whitelisted against real, sortable
+        // columns so an arbitrary `sort` query param can't be used to probe
+        // schema/column names or order by something not meant to be exposed.
+        $sortable = ['id', 'username', 'email', 'status', 'created_at', 'updated_at'];
 
-      // Paginate with customizable per-page count
-      $users = $query->paginate($request->input('per_page', 5))->appends($request->query());
+        if ($request->filled('sort') && in_array($request->sort, $sortable, true)) {
+            $order = $request->input('order') === 'desc' ? 'desc' : 'asc';
+            $query->orderBy($request->sort, $order);
+        }
 
-      return response()->json([
-          'data' => UserResource::collection($users),
-          'meta' => [
-              'total' => $users->total(),
-              'per_page' => $users->perPage(),
-              'current_page' => $users->currentPage(),
-              'last_page' => $users->lastPage(),
-          ]
-      ]);
+        // Paginate with customizable per-page count
+        $users = $query->paginate($request->input('per_page', 5))->appends($request->query());
+
+        return response()->json([
+            'data' => UserResource::collection($users),
+            'meta' => [
+                'total' => $users->total(),
+                'per_page' => $users->perPage(),
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+            ],
+        ]);
     }
 
-    public function store(StoreUserRequest $request) {
-      Gate::authorize('users.create');
+    public function store(StoreUserRequest $request)
+    {
+        Gate::authorize('users.create');
 
-      $data = $request->validated();
-      $data['img_path'] = null;
+        $data = $request->validated();
+        $data['img_path'] = null;
 
-      if ($request->hasFile('photo_id')) {
-          $path = $request->file('photo_id')->store('images/users/personnel', 'public');
-          $data['img_path'] = $path;
-      }
+        if ($request->hasFile('photo_id')) {
+            $path = $request->file('photo_id')->store('images/users/personnel', 'public');
+            $data['img_path'] = $path;
+        }
 
-      $user = User::create([
-          'username' => $data['username'],
-          'email' => $data['email'],
-          'password' => Hash::make($data['password']),
-      ]);
+        $user = User::create([
+            'username' => $data['username'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+        ]);
 
-      if ($user) {
-          $user->roles()->syncWithoutDetaching([$data['role']]);
+        if ($user) {
+            $user->roles()->syncWithoutDetaching([$data['role']]);
 
-          $profile = Profile::create([
-              'user_id' => $user->id,
-              'display_name' => $data['display_name'],
-              'name' => $data['name'],
-              'gender' => $data['gender'],
-              'designation' => $data['designation'],
-              'engagement' => 'ready',
-              'img_path' => $data['img_path'],
-          ]);
+            $profile = Profile::create([
+                'user_id' => $user->id,
+                'display_name' => $data['display_name'],
+                'name' => $data['name'],
+                'gender' => $data['gender'],
+                'designation' => $data['designation'],
+                'engagement' => 'ready',
+                'img_path' => $data['img_path'],
+            ]);
 
-          $this->syncProfileOffices($profile, $data['offices_assigned'] ?? null);
-          $profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
-      }
+            $this->syncProfileOffices($profile, $data['offices_assigned'] ?? null);
+            $profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
+        }
 
-      return new UserResource($user);
+        return new UserResource($user);
     }
 
-    public function update(UpdateUserRequest $request, User $user) {
-      Gate::authorize('users.update');
-      
-      $data = $request->validated();
+    public function update(UpdateUserRequest $request, User $user)
+    {
+        Gate::authorize('users.update');
 
-      $user_data = [];
-      $profile_data = [];
-      $changedData = [];
+        $data = $request->validated();
 
-      foreach ($data as $key => $value) {
-          if ($user->$key !== $value) {
-              $changedData[$key] = $value;
+        $user_data = [];
+        $profile_data = [];
+        $changedData = [];
 
-              if ($key === 'email' || $key === 'username' || $key === 'role') {
-                  $user_data[$key] = $value;
-              } else if ($key === 'display_name' || $key === 'name' || $key === 'gender' || $key === 'designation') {
-                  $profile_data[$key] = $value;
-              }
-          }
-      }
+        foreach ($data as $key => $value) {
+            if ($value !== $user->$key) {
+                $changedData[$key] = $value;
 
-      if (!empty($changedData)) {
-          if ($request->hasFile('photo_id')) {
-              $storage_public = Storage::disk('public');
+                if ($key === 'email' || $key === 'username' || $key === 'role' || $key === 'status') {
+                    $user_data[$key] = $value;
+                } elseif ($key === 'display_name' || $key === 'name' || $key === 'gender' || $key === 'designation') {
+                    $profile_data[$key] = $value;
+                }
+            }
+        }
 
-              if ($user->profile->img_path && $storage_public->exists($user->profile->img_path)) {
-                  $storage_public->delete($user->profile->img_path);
-              }
+        if (! empty($changedData)) {
+            if ($request->hasFile('photo_id')) {
+                $storage_public = Storage::disk('public');
 
-              $path = $request->file('photo_id')->store('images/users/personnel', 'public');
-              $profile_data['img_path'] = $path;
-          }
+                if ($user->profile->img_path && $storage_public->exists($user->profile->img_path)) {
+                    $storage_public->delete($user->profile->img_path);
+                }
 
-          $user->update($user_data);
+                $path = $request->file('photo_id')->store('images/users/personnel', 'public');
+                $profile_data['img_path'] = $path;
+            }
 
-          if ($user) {
-              $user->roles()->sync([$data['role']]);
+            $user->update($user_data);
 
-              Profile::where('user_id', $user->id)->update($profile_data);
+            if ($user) {
+                $user->roles()->sync([$data['role']]);
 
-              $user->refresh();
-              $this->syncProfileOffices($user->profile, $data['offices_assigned'] ?? null);
-              $user->profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
-          }
-      }
+                Profile::where('user_id', $user->id)->update($profile_data);
 
-      return new UserResource($user->fresh());
+                $user->refresh();
+                $this->syncProfileOffices($user->profile, $data['offices_assigned'] ?? null);
+                $user->profile->agencies()->sync($data['agencies_assigned_ids'] ?? []);
+            }
+        }
+
+        return new UserResource($user->fresh());
     }
 
-    public function destroy(User $user) {
-      Gate::authorize('users.delete');
+    public function destroy(User $user)
+    {
+        Gate::authorize('users.delete');
 
-      $storage_public = Storage::disk('public');
-      if ($user->img_path && $storage_public->exists($user->img_path)) {
-        $storage_public->delete($user->img_path);
-      }
+        $storage_public = Storage::disk('public');
+        if ($user->img_path && $storage_public->exists($user->img_path)) {
+            $storage_public->delete($user->img_path);
+        }
 
-      $user->delete();
-      
-      return new UserResource($user);
+        $user->delete();
+
+        return new UserResource($user);
     }
 
     // Assign role to a user
@@ -169,7 +179,8 @@ class UserController extends Controller
         return response()->json(['message' => 'Role assigned to user successfully']);
     }
 
-    private function syncProfileOffices(Profile $profile, ?string $officesAssignedJson = null): void {
+    private function syncProfileOffices(Profile $profile, ?string $officesAssignedJson = null): void
+    {
         $profile->profileOffices()->delete();
 
         if (blank($officesAssignedJson)) {
@@ -178,12 +189,12 @@ class UserController extends Controller
 
         $offices = json_decode($officesAssignedJson, true);
 
-        if (!is_array($offices) || empty($offices)) {
+        if (! is_array($offices) || empty($offices)) {
             return;
         }
 
         $rows = collect($offices)
-            ->filter(fn ($office) => !empty($office['id']))
+            ->filter(fn ($office) => ! empty($office['id']))
             ->unique('id')
             ->map(function ($office) use ($profile) {
                 return [
@@ -198,7 +209,7 @@ class UserController extends Controller
             ->values()
             ->all();
 
-        if (!empty($rows)) {
+        if (! empty($rows)) {
             ProfileOffice::insert($rows);
         }
     }
@@ -207,13 +218,12 @@ class UserController extends Controller
      * Handle user heartbeat to update profile's last_seen_at timestamp.
      * This is called periodically by the frontend to indicate the user is still active.
      *
-     * @param \Illuminate\Http\Request $request
-     * @return \Illuminate\Http\Response
+     * @return Response
      */
     public function heartbeat(Request $request)
     {
         $user = $request->user();
-        
+
         // Update the user's profile last_seen_at timestamp
         $user->profile->update([
             'last_seen_at' => now(),
@@ -227,7 +237,7 @@ class UserController extends Controller
      * Get all users with their online/offline/busy status.
      * Includes profile data, roles, and departments for display.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return JsonResponse
      */
     public function onlineList()
     {
@@ -252,38 +262,42 @@ class UserController extends Controller
                 //     : Profile::STATUS_OFFLINE;
 
                 return [
-                  'id' => $user->id,
-                  'email' => $user->email,
-                  'username' => $user->username,
-                  'display_name' => $profile?->display_name,
-                  'designation' => $profile?->designation,
+                    'id' => $user->id,
+                    'email' => $user->email,
+                    'username' => $user->username,
+                    'display_name' => $profile?->display_name,
+                    'designation' => $profile?->designation,
 
-                  // Use the profile value maintained by the heartbeat endpoints.
-                  'status' => $profile?->status ?? Profile::STATUS_OFFLINE,
+                    // Use the profile value maintained by the heartbeat endpoints.
+                    'status' => $profile?->status ?? Profile::STATUS_OFFLINE,
 
-                  'status_text' => $profile?->status_text,
-                  'last_seen_at' => $profile?->last_seen_at,
+                    // Maintained by ProfileEngagementService from actual
+                    // active tickets, independent of online/idle/offline.
+                    'engagement' => $profile?->engagement,
 
-                  'last_seen_at_humanized' => $lastSeenAt
-                      ? $lastSeenAt->diffForHumans()
-                      : null,
+                    'status_text' => $profile?->status_text,
+                    'last_seen_at' => $profile?->last_seen_at,
 
-                  'roles' => $user->roles->map(fn ($role) => [
-                      'id' => $role->id,
-                      'title' => $role->title,
-                  ])->values(),
+                    'last_seen_at_humanized' => $lastSeenAt
+                        ? $lastSeenAt->diffForHumans()
+                        : null,
 
-                  'departments' => $profile?->departments
-                      ? $profile->departments->map(fn ($department) => [
-                          'id' => $department->id,
-                          'name' => $department->name,
-                      ])->values()
-                      : [],
+                    'roles' => $user->roles->map(fn ($role) => [
+                        'id' => $role->id,
+                        'title' => $role->title,
+                    ])->values(),
 
-                  'img_path' => $profile?->img_path
-                      ? asset("storage/{$profile->img_path}")
-                      : null,
-              ];
+                    'departments' => $profile?->departments
+                        ? $profile->departments->map(fn ($department) => [
+                            'id' => $department->id,
+                            'name' => $department->name,
+                        ])->values()
+                        : [],
+
+                    'img_path' => $profile?->img_path
+                        ? asset("storage/{$profile->img_path}")
+                        : null,
+                ];
             })
             ->sortBy(fn ($user) => $user['display_name'] ?? $user['email'])
             ->values();

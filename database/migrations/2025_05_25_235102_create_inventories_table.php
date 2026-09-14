@@ -22,14 +22,14 @@ return new class extends Migration
             $table->index('employee_id');
 
             $table->foreignId('item_type_id')->nullable() // The general classification of the physical asset.
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->foreignId('brand_model_id')->nullable() // The specific product model for this type of physical asset, if applicable.
-              ->constrained()
-              ->nullOnDelete()->comment('This links a primary asset (like an Acer SA272Q Monitor, an Epson L360 Printer, or an APC BX625CI-MS UPS) to its specific Brand Model entry. For a generic assembled Desktop/CPU, this might remain NULL');
+                ->constrained()
+                ->nullOnDelete()->comment('This links a primary asset (like an Acer SA272Q Monitor, an Epson L360 Printer, or an APC BX625CI-MS UPS) to its specific Brand Model entry. For a generic assembled Desktop/CPU, this might remain NULL');
             $table->foreignId('parent_component_id')->nullable() // The specific product model for this type of physical asset, if applicable.
-              ->constrained('inventories')
-              ->nullOnDelete()->comment('For some item_type like Monitor, Printer, UPS, etc. this links to the parent component. For example, a Monitor might be linked to a Desktop/CPU.');
+                ->constrained('inventories')
+                ->nullOnDelete()->comment('For some item_type like Monitor, Printer, UPS, etc. this links to the parent component. For example, a Monitor might be linked to a Desktop/CPU.');
             $table->string('ip_address')->nullable();
             $table->string('mac_address')->nullable();
             $table->text('remarks')->nullable();
@@ -54,10 +54,10 @@ return new class extends Migration
             // $table->text('description')->nullable();
             // $table->string('control_number')->comment('Pre and Post - Repair Inspection Report Number / Control Number')->nullable();
             // $table->timestamp('date_issued')->nullable();
-            
+
             // $table->timestamp('date_accepted')->nullable();
             // $table->timestamp('date_installed')->nullable();
-            
+
             // $table->string('inventory_type')->nullable();
             $table->timestamps();
         });

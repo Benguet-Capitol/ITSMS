@@ -15,13 +15,13 @@ return new class extends Migration
             // Other Primary Assets (like a Monitor or Printer) that are connected to a main Primary Asset (like a Desktop)
             // Linking Inventories records to other Inventories records
             $table->id();
-            
+
             $table->foreignId('source_asset_id')->nullable()
-              ->constrained('inventories')
-              ->cascadeOnDelete()->comment('Inventories typically the Desktop/CPU'); // (FK to Inventories.id, typically the Desktop)
+                ->constrained('inventories')
+                ->cascadeOnDelete()->comment('Inventories typically the Desktop/CPU'); // (FK to Inventories.id, typically the Desktop)
             $table->foreignId('target_asset_id')->nullable()
-              ->constrained('inventories')
-              ->cascadeOnDelete()->comment('Inventories typically the Monitor, Printer, UPS, etc.'); // (FK to Inventories.id, typically the Monitor, Printer, UPS)
+                ->constrained('inventories')
+                ->cascadeOnDelete()->comment('Inventories typically the Monitor, Printer, UPS, etc.'); // (FK to Inventories.id, typically the Monitor, Printer, UPS)
             $table->string('association_type')->nullable()->comment('connected_to, uses');
             $table->string('connection_details')->nullable();
             $table->timestamps();

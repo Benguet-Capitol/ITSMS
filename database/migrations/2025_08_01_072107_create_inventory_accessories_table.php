@@ -16,11 +16,11 @@ return new class extends Migration
             // Mapping Inventories to Brand Model for non-tagged accessories
             $table->id();
             $table->foreignId('inventory_id')->nullable()
-              ->constrained('inventories')
-              ->cascadeOnDelete()->comment('Inventories where item_type_id is Desktop/CPU');
+                ->constrained('inventories')
+                ->cascadeOnDelete()->comment('Inventories where item_type_id is Desktop/CPU');
             $table->foreignId('brand_model_id')->nullable()
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->text('notes')->nullable();
             $table->timestamps();
             // $table->unique(['desktop_inventory_id', 'brand_model_id']); // One of each type of accessory per desktop

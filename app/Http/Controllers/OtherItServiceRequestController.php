@@ -6,14 +6,15 @@ use App\Http\Requests\StoreOtherItServiceRequest;
 use App\Http\Requests\UpdateOtherItServiceRequest;
 use App\Http\Resources\OtherItServiceRequestResource;
 use App\Models\OtherItServiceRequest;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Log;
 
 class OtherItServiceRequestController extends Controller
 {
-    public function index(Request $request) {
+    public function index(Request $request)
+    {
         Gate::authorize('requests.other_it_services.view');
 
         $query = OtherItServiceRequest::query();
@@ -48,7 +49,8 @@ class OtherItServiceRequestController extends Controller
         ]);
     }
 
-    public function store(StoreOtherItServiceRequest $request) {
+    public function store(StoreOtherItServiceRequest $request)
+    {
         Gate::authorize('requests.other_it_services.create');
 
         $data = $request->validated();
@@ -58,13 +60,15 @@ class OtherItServiceRequestController extends Controller
         return new OtherItServiceRequestResource($record);
     }
 
-    public function show(OtherItServiceRequest $otherItServiceRequest) {
+    public function show(OtherItServiceRequest $otherItServiceRequest)
+    {
         Gate::authorize('requests.other_it_services.view');
 
         return new OtherItServiceRequestResource($otherItServiceRequest);
     }
 
-    public function update(UpdateOtherItServiceRequest $request, OtherItServiceRequest $otherItServiceRequest) {
+    public function update(UpdateOtherItServiceRequest $request, OtherItServiceRequest $otherItServiceRequest)
+    {
         Gate::authorize('requests.other_it_services.update');
 
         $data = $request->validated();
@@ -74,21 +78,23 @@ class OtherItServiceRequestController extends Controller
         return new OtherItServiceRequestResource($otherItServiceRequest);
     }
 
-    public function destroy(OtherItServiceRequest $otherItServiceRequest) {
+    public function destroy(OtherItServiceRequest $otherItServiceRequest)
+    {
         Gate::authorize('requests.other_it_services.delete');
 
         $otherItServiceRequest->delete();
 
         return new OtherItServiceRequestResource($otherItServiceRequest);
     }
-    
-    public function print(OtherItServiceRequest $otherItServiceRequest) {
+
+    public function print(OtherItServiceRequest $otherItServiceRequest)
+    {
         Gate::authorize('requests.other_it_services.print');
 
         try {
             $pdf = Pdf::loadView('reports.other-it-service-request', [
                 'requestRecord' => $otherItServiceRequest,
-                'generatedAt'   => now(),
+                'generatedAt' => now(),
             ])->setPaper('letter', 'portrait');
 
             while (ob_get_level() > 0) {
@@ -104,8 +110,8 @@ class OtherItServiceRequestController extends Controller
 
             $filename = implode('_', array_map(
                 fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
-                $filenameParts 
-            )) . '.pdf';
+                $filenameParts
+            )).'.pdf';
 
             while (ob_get_level() > 0) {
                 ob_end_clean();

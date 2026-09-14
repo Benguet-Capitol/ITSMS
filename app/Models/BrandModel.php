@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class BrandModel extends Model
 {
+    use HasFactory;
+
     protected $with = ['brand', 'item_type'];
 
     protected $fillable = [
@@ -22,15 +25,28 @@ class BrandModel extends Model
         'display_name',
     ];
 
-    public function brand() {
+    public function brand()
+    {
         return $this->belongsTo(Brand::class);
     }
 
-    public function item_type() {
+    public function item_type()
+    {
         return $this->belongsTo(ItemType::class);
     }
 
-    public function getDisplayNameAttribute(): string {
+    public function inventories()
+    {
+        return $this->hasMany(Inventory::class);
+    }
+
+    public function internal_components()
+    {
+        return $this->hasMany(InventoryInternalComponent::class);
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
         $itemType = trim((string) data_get($this, 'item_type.type'));
         $specification = trim((string) $this->specification);
         $name = trim((string) $this->name);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,22 +19,23 @@ class UpdateItServiceRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'code' => ['nullable', 'string', 'max:4', 'unique:it_services,code,' . $this->it_service->id],
+            'code' => ['nullable', 'string', 'max:4', 'unique:it_services,code,'.$this->it_service->id],
         ];
     }
 
-    public function messages(): array {
+    public function messages(): array
+    {
         return [
-            'name.required'   => 'The :attribute is required.',
-            'code.unique'   => 'This :attribute already exists.',
-            'description.required'   => 'The :attribute is required.',
+            'name.required' => 'The :attribute is required.',
+            'code.unique' => 'This :attribute already exists.',
+            'description.required' => 'The :attribute is required.',
         ];
     }
 }

@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
             $table->foreignId('department_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('position_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->string('uid')->nullable();
             $table->string('firstname');
             $table->string('middlename')->nullable();

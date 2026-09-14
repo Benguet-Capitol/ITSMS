@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('brand_models', function (Blueprint $table) {
             $table->id();
             $table->foreignId('brand_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('item_type_id')->nullable() // The general classification of this product model in your catalog.
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->string('name')->nullable();
             $table->string('specification')->nullable();
             $table->json('specifications_json')->nullable();

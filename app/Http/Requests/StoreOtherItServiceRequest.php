@@ -24,35 +24,35 @@ class StoreOtherItServiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'control_number'   => ['nullable', 'string', 'max:255', 'unique:other_it_service_requests,control_number'],
-            'status'           => ['required', 'string', Rule::in(['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'])],
-            'date_of_request'  => ['nullable', 'date'],
+            'control_number' => ['nullable', 'string', 'max:255', 'unique:other_it_service_requests,control_number'],
+            'status' => ['required', 'string', Rule::in(['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'])],
+            'date_of_request' => ['nullable', 'date'],
             'department_office' => ['nullable', 'string', 'max:255'],
-            'requestor_name'   => ['nullable', 'string', 'max:255'],
+            'requestor_name' => ['nullable', 'string', 'max:255'],
 
-            'service_printing'             => ['nullable', 'boolean'],
+            'service_printing' => ['nullable', 'boolean'],
             'service_information_material' => ['nullable', 'boolean'],
-            'service_program_paper'        => ['nullable', 'boolean'],
-            'service_brochure'             => ['nullable', 'boolean'],
-            'service_iec_material'         => ['nullable', 'boolean'],
-            'service_handbook'             => ['nullable', 'boolean'],
-            'service_certificates'         => ['nullable', 'boolean'],
-            'service_others'               => ['nullable', 'boolean'],
-            'service_qty'                  => ['nullable', 'integer', 'min:1'],
-            'service_laptop_tv_setup'      => ['nullable', 'boolean'],
-            'service_others_specify'       => ['nullable', 'string'],
+            'service_program_paper' => ['nullable', 'boolean'],
+            'service_brochure' => ['nullable', 'boolean'],
+            'service_iec_material' => ['nullable', 'boolean'],
+            'service_handbook' => ['nullable', 'boolean'],
+            'service_certificates' => ['nullable', 'boolean'],
+            'service_others' => ['nullable', 'boolean'],
+            'service_qty' => ['nullable', 'integer', 'min:1'],
+            'service_laptop_tv_setup' => ['nullable', 'boolean'],
+            'service_others_specify' => ['nullable', 'string'],
 
             'program_activity_details' => ['nullable', 'string'],
-            'activity_date_text'       => ['nullable', 'string', 'max:255'],
-            'activity_time'            => ['nullable', 'string', 'max:50'],
+            'activity_date_text' => ['nullable', 'string', 'max:255'],
+            'activity_time' => ['nullable', 'string', 'max:50'],
 
             'assigned_personnel' => ['nullable', 'string', 'max:255'],
-            'date_received'      => ['nullable', 'date'],
-            'action_taken'       => ['nullable', 'string'],
+            'date_received' => ['nullable', 'date'],
+            'action_taken' => ['nullable', 'string'],
 
             'feedback_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
-            'feedback_name'   => ['nullable', 'string', 'max:255'],
-            'feedback_date'   => ['nullable', 'date'],
+            'feedback_name' => ['nullable', 'string', 'max:255'],
+            'feedback_date' => ['nullable', 'date'],
         ];
     }
 }

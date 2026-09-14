@@ -28,7 +28,7 @@ class StoreTicketRequest extends FormRequest
             'concern' => 'required|string',
             'query_status' => ['required', new Enum(TicketStatus::class)],
             'request_status' => 'nullable|string',
-            'priority' => 'nullable|string',
+            'complexity_level_id' => 'nullable|exists:ticket_complexity_levels,id',
             'date' => 'nullable|date',
             'service_method' => ['required', new Enum(ServiceMethod::class)],
             'contact_number' => 'nullable|string',
@@ -68,7 +68,7 @@ class StoreTicketRequest extends FormRequest
                 }
             }
 
-            if (!$inventoryId && !$isOtherAgency && !$officeId) {
+            if (! $inventoryId && ! $isOtherAgency && ! $officeId) {
                 $validator->errors()->add(
                     'office_id',
                     'Office is required when no inventory is selected.'

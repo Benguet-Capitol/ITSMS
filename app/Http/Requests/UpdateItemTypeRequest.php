@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -18,12 +19,12 @@ class UpdateItemTypeRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
-            'type' => ['required', 'string', 'max:255', 'unique:item_types,type,' . $this->item_type->id],
+            'type' => ['required', 'string', 'max:255', 'unique:item_types,type,'.$this->item_type->id],
             'classification' => ['required', 'string', 'max:255'],
             'purpose' => ['required', 'string', 'max:255'],
             'is_main_inventory' => ['required', 'boolean', 'default' => false],
@@ -33,7 +34,8 @@ class UpdateItemTypeRequest extends FormRequest
         ];
     }
 
-    public function attributes(): array {
+    public function attributes(): array
+    {
         return [
             'type' => 'Type',
             'classification' => 'Classification',
@@ -41,11 +43,12 @@ class UpdateItemTypeRequest extends FormRequest
         ];
     }
 
-    public function messages(): array {
+    public function messages(): array
+    {
         return [
-            'type.unique'   => 'The :attribute already exists.',
-            'classification.required'   => 'The :attribute is required.',
-            'purpose.required'   => 'The :attribute is required.',
+            'type.unique' => 'The :attribute already exists.',
+            'classification.required' => 'The :attribute is required.',
+            'purpose.required' => 'The :attribute is required.',
         ];
     }
 }

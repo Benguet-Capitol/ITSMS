@@ -4,9 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\BrandModelResource;
-use App\Http\Resources\ItemTypeResource;
-use App\Http\Resources\InventoryInternalComponentResource;
 
 class InventoryResource extends JsonResource
 {
@@ -43,7 +40,7 @@ class InventoryResource extends JsonResource
 
         $effectiveEmployeeId = $this->employee_id;
 
-        if (!$effectiveEmployeeId) {
+        if (! $effectiveEmployeeId) {
             $effectiveEmployeeId = $this->parent_component?->employee_id;
         }
 
@@ -57,6 +54,7 @@ class InventoryResource extends JsonResource
 
         return [
             'id' => $this->id,
+            'public_id' => $this->public_id,
 
             'employee_id' => $effectiveEmployeeId,
 

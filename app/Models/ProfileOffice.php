@@ -13,7 +13,8 @@ class ProfileOffice extends Model
         'office_desc',
     ];
 
-    public function profile() {
+    public function profile()
+    {
         return $this->belongsTo(Profile::class);
     }
 }

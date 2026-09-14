@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('inventories', function (Blueprint $table) {
             $table->unsignedBigInteger('division_id')->nullable()->after('office_name');
             $table->string('division_name')->nullable()->after('division_id');
-            
+
             $table->index('division_id');
         });
     }

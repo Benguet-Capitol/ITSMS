@@ -2,15 +2,29 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Carbon\Carbon;
-use App\Enums\TicketStatus;
 use App\Enums\ServiceMethod;
-use App\Models\Solution;
+use App\Enums\TicketStatus;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Ticket extends Model
 {
-    protected $with = ['profile', 'employee', 'inventory.parent_component', 'itService', 'personnel', 'item_type', 'solution', 'agency'];
+    use HasFactory;
+
+    protected static function booted(): void
+    {
+        // public_id is the safe, non-guessable identifier external
+        // surfaces reference instead of the raw sequential id -- generated
+        // once here rather than mass-assignable, so it can never be
+        // set/overridden via request input.
+        static::creating(function (Ticket $ticket) {
+            $ticket->public_id ??= (string) Str::ulid();
+        });
+    }
+
+    protected $with = ['profile', 'employee', 'inventory.parent_component', 'itService', 'personnel', 'item_type', 'solution', 'agency', 'complexityLevel'];
 
     protected $fillable = [
         'profile_id',
@@ -28,10 +42,13 @@ class Ticket extends Model
         'concern',
         'query_status',
         'request_status',
-        'priority',
+        'complexity_level_id',
         'service_method',
         'date',
+        'accepted_at',
+        'resolved_at',
         'released_at',
+        'released_by',
         'contact_number',
         'is_other_agency',
         'quality',
@@ -40,20 +57,25 @@ class Ticket extends Model
     ];
 
     protected $casts = [
-    'query_status' => TicketStatus::class,
-    'request_status' => TicketStatus::class,
-    'service_method' => ServiceMethod::class,
+        'query_status' => TicketStatus::class,
+        'request_status' => TicketStatus::class,
+        'service_method' => ServiceMethod::class,
+        'accepted_at' => 'datetime',
+        'resolved_at' => 'datetime',
     ];
 
-    public static function generateTicketNumber(): string {
-      $today = Carbon::now()->format('Ymd');
-      $count = self::whereDate('created_at', Carbon::today())->count();
-      $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
-      return "{$today}-{$serial}"; // 2025-0616-0001 / 20250616-0001
+    public static function generateTicketNumber(): string
+    {
+        $today = Carbon::now()->format('Ymd');
+        $count = self::whereDate('created_at', Carbon::today())->count();
+        $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+
+        return "{$today}-{$serial}"; // 2025-0616-0001 / 20250616-0001
     }
 
     // Accessor: dynamically compute average rating
-    public function getComputedRatingAttribute(): ?int {
+    public function getComputedRatingAttribute(): ?int
+    {
         $scores = [
             $this->quality,
             $this->efficiency,
@@ -61,7 +83,7 @@ class Ticket extends Model
         ];
 
         // Filter out nulls in case some scores aren’t filled
-        $validScores = array_filter($scores, fn($val) => !is_null($val));
+        $validScores = array_filter($scores, fn ($val) => ! is_null($val));
 
         if (count($validScores) === 3) {
             return (int) round(array_sum($validScores) / 3);
@@ -76,42 +98,55 @@ class Ticket extends Model
         */
     }
 
-    public function profile() {
-      return $this->belongsTo(Profile::class);
+    public function profile()
+    {
+        return $this->belongsTo(Profile::class);
     }
 
-    public function employee() {
-      return $this->belongsTo(Employee::class);
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
     }
 
-    public function inventory() {
-      return $this->belongsTo(Inventory::class);
-    }
-    
-    public function itService() {
-      return $this->belongsTo(ItService::class);
+    public function inventory()
+    {
+        return $this->belongsTo(Inventory::class);
     }
 
-    public function personnel() {
-      return $this->belongsToMany(Profile::class, 'ticket_personnel')
-        ->using(TicketPersonnel::class)
-        ->withTimestamps();
+    public function itService()
+    {
+        return $this->belongsTo(ItService::class);
     }
 
-    public function item_type() {
-      return $this->belongsTo(ItemType::class);
+    public function personnel()
+    {
+        return $this->belongsToMany(Profile::class, 'ticket_personnel')
+            ->using(TicketPersonnel::class)
+            ->withTimestamps();
     }
 
-    public function solution() {
+    public function item_type()
+    {
+        return $this->belongsTo(ItemType::class);
+    }
+
+    public function solution()
+    {
         return $this->belongsTo(Solution::class);
     }
 
-    public function agency() {
-      return $this->belongsTo(Agency::class);
+    public function agency()
+    {
+        return $this->belongsTo(Agency::class);
     }
 
-    public function assessment() {
+    public function assessment()
+    {
         return $this->hasOne(TicketAssessment::class);
     }
-}
 
+    public function complexityLevel()
+    {
+        return $this->belongsTo(TicketComplexityLevel::class);
+    }
+}

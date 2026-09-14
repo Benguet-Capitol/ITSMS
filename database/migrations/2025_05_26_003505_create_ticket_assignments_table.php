@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('ticket_assignments', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ticket_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->string('status');
             $table->timestamp('accepted_at');
             $table->timestamps();

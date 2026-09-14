@@ -2,12 +2,11 @@
 
 namespace App\Notifications;
 
+use App\Models\Profile;
+use App\Models\Ticket;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Models\Ticket;
-use App\Models\Profile;
 
 class TicketPersonnelJoinedNotification extends Notification
 {

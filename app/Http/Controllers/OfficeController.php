@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Services\HrisClientService;
 use App\Http\Resources\OfficeResource;
+use App\Services\HrisClientService;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 
 class OfficeController extends Controller
 {
-    public function index(Request $request, HrisClientService $hris) {
+    public function index(Request $request, HrisClientService $hris)
+    {
         Gate::authorize('offices.view');
 
         $offices = collect(
@@ -108,7 +109,8 @@ class OfficeController extends Controller
         ]);
     }
 
-    public function search(Request $request, HrisClientService $hris) {
+    public function search(Request $request, HrisClientService $hris)
+    {
         Gate::authorize('offices.search');
 
         $query = trim(

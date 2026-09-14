@@ -14,7 +14,7 @@ enum TicketStatus: string
     case Resolved = 'resolved';
     case Assessed = 'assessed';
     case Cancelled = 'cancelled';
-    
+
     // Request Status
     case Open = 'open';
     case Accepted = 'accepted';

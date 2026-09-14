@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('common_problems', function (Blueprint $table) {
             $table->id();
             $table->foreignId('item_type_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->string('code')->nullable();
             $table->string('general_term')->nullable();
             $table->text('information')->nullable();

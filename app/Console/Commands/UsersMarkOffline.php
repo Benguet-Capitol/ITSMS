@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\Profile;
+use Illuminate\Console\Command;
 
 class UsersMarkOffline extends Command
 {
@@ -19,30 +19,37 @@ class UsersMarkOffline extends Command
      *
      * @var string
      */
-    protected $description = 'Mark users as offline if inactive for more than 2 minutes';
+    protected $description = 'Mark users idle after 2 minutes and offline after 15 minutes of inactivity';
 
     /**
      * Execute the console command.
      */
     public function handle(): int
     {
-        $threshold = now()->subMinutes(2);
+        $idleThreshold = now()->subMinutes(2);
+        $offlineThreshold = now()->subMinutes(15);
 
-        $affected = Profile::query()
-          ->whereIn('status', [
-              Profile::STATUS_ONLINE,
-              Profile::STATUS_BUSY,
-          ])
-          ->whereNotNull('last_seen_at')
-          ->where('last_seen_at', '<', $threshold)
-          ->update([
-              'status' => Profile::STATUS_OFFLINE,
-              'engagement' => null,
-              'updated_at' => now(),
-          ]);
+        // engagement (ready/busy) is deliberately left untouched here -- see
+        // ProfileController::markIdle()/setStatusOffline() for why.
+        Profile::query()
+            ->where('status', Profile::STATUS_ONLINE)
+            ->whereNotNull('last_seen_at')
+            ->where('last_seen_at', '<', $idleThreshold)
+            ->update([
+                'status' => Profile::STATUS_IDLE,
+            ]);
 
-        $this->info("Marked {$affected} inactive users offline.");
+        Profile::query()
+            ->whereIn('status', [
+                Profile::STATUS_ONLINE,
+                Profile::STATUS_IDLE,
+            ])
+            ->whereNotNull('last_seen_at')
+            ->where('last_seen_at', '<', $offlineThreshold)
+            ->update([
+                'status' => Profile::STATUS_OFFLINE,
+            ]);
 
-        return Command::SUCCESS;
+        return self::SUCCESS;
     }
 }

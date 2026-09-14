@@ -11,214 +11,244 @@ use App\Http\Requests\StoreTicketRequest;
 use App\Http\Requests\UpdateTicketRequest;
 use App\Http\Resources\TicketResource;
 use App\Models\Ticket;
+use App\Models\TicketAssessment;
+use App\Notifications\TicketPersonnelJoinedNotification;
 use App\Services\HrisClientService;
+use App\Services\PdfImageService;
 use App\Services\ProfileEngagementService;
-use Barryvdh\DomPDF\Facade\Pdf; 
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
-use App\Services\PdfImageService;
-use App\Notifications\TicketPersonnelJoinedNotification;
 
 class TicketController extends Controller
 {
-    public function index(Request $request, HrisClientService $hris) {
-      Gate::authorize('tickets.view');
+    public function index(Request $request, HrisClientService $hris)
+    {
+        Gate::authorize('tickets.view');
 
-      $profileId = Auth::user()->profile->id;
-      $baseQuery = Ticket::query()->with([
-          'profile',
-          'inventory',
-          'inventory.item_type',
-          'inventory.brand_model',
-          'inventory.parent_component',
-          'inventory.parent_component.item_type',
-          'inventory.parent_component.brand_model',
-          'agency',
-          'itService',
-          'solution',
-          'solution.author',
-          'personnel',
-          'assessment',
-      ]);
+        // HRIS is a real external system this app has no control over --
+        // when it's unreachable/erroring, the ticket list itself (which
+        // has nothing to do with HRIS) shouldn't 500 for every user.
+        // Degrade gracefully (no employee-name enrichment) and tell the
+        // frontend via meta so it can show a "this isn't an ITSMS problem"
+        // notice instead of a blank/broken table.
+        $hrisUnavailable = false;
 
-      if ($request->filled('search')) {
-          $search = trim((string) $request->input('search', ''));
+        $profileId = Auth::user()->profile->id;
+        $baseQuery = Ticket::query()->with([
+            'profile',
+            'inventory',
+            'inventory.item_type',
+            'inventory.brand_model',
+            'inventory.parent_component',
+            'inventory.parent_component.item_type',
+            'inventory.parent_component.brand_model',
+            'agency',
+            'itService',
+            'solution',
+            'solution.author',
+            'personnel',
+            'assessment',
+        ]);
 
-          $baseQuery->where(function ($q) use ($search, $hris) {
-              $like = "%{$search}%";
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search', ''));
 
-              // Ticket-level fields
-              $q->where('concern', 'LIKE', $like)
-                ->orWhere('ticket_number', 'LIKE', $like)
-                ->orWhere('full_name', 'LIKE', $like)
-                ->orWhere('client_name', 'LIKE', $like);
+            $baseQuery->where(function ($q) use ($search, $hris, &$hrisUnavailable) {
+                $like = "%{$search}%";
 
-              // If search has letters, also match HRIS employees
-              if (preg_match('/[a-zA-Z]/', $search)) {
-                  $employeeIds = collect($hris->searchEmployees($search))
-                      ->filter(fn ($e) => isset($e['id']))
-                      ->pluck('id')
-                      ->map(fn ($v) => (int) $v)
-                      ->values()
-                      ->all();
+                // Ticket-level fields
+                $q->where('concern', 'LIKE', $like)
+                    ->orWhere('ticket_number', 'LIKE', $like)
+                    ->orWhere('full_name', 'LIKE', $like)
+                    ->orWhere('client_name', 'LIKE', $like);
 
-                  if (!empty($employeeIds)) {
-                      $q->orWhereHas('inventory', function ($inv) use ($employeeIds) {
-                          $inv->whereIn('employee_id', $employeeIds)
-                              ->orWhereHas('parent_component', function ($pc) use ($employeeIds) {
-                                  $pc->whereIn('employee_id', $employeeIds);
-                              });
-                      });
-                  }
-              }
+                // If search has letters, also match HRIS employees
+                if (preg_match('/[a-zA-Z]/', $search)) {
+                    try {
+                        $employeeIds = collect($hris->searchEmployees($search))
+                            ->filter(fn ($e) => isset($e['id']))
+                            ->pluck('id')
+                            ->map(fn ($v) => (int) $v)
+                            ->values()
+                            ->all();
 
-              // Property number/serial/IP on inventory or parent component
-              $q->orWhereHas('inventory', function ($inv) use ($like) {
-                  $inv->where('property_number', 'like', $like)
-                      ->orWhere('serial_number', 'like', $like)
-                      ->orWhere('ip_address', 'like', $like)
-                      ->orWhereHas('parent_component', function ($pc) use ($like) {
-                          $pc->where('property_number', 'like', $like)
-                            ->orWhere('serial_number', 'like', $like)
-                            ->orWhere('ip_address', 'like', $like);
-                      });
-              });
-          });
-      }
+                        if (! empty($employeeIds)) {
+                            $q->orWhereHas('inventory', function ($inv) use ($employeeIds) {
+                                $inv->whereIn('employee_id', $employeeIds)
+                                    ->orWhereHas('parent_component', function ($pc) use ($employeeIds) {
+                                        $pc->whereIn('employee_id', $employeeIds);
+                                    });
+                            });
+                        }
+                    } catch (\Throwable $e) {
+                        $hrisUnavailable = true;
+                    }
+                }
 
-      $query = (clone $baseQuery)
-          ->with([
-              'profile',
-              'inventory',
-              'inventory.item_type',
-              'inventory.brand_model',
-              'inventory.parent_component',
-              'inventory.parent_component.item_type',
-              'inventory.parent_component.brand_model',
-              'agency',
-              'itService',
-              'solution',
-              'solution.author',
-              'personnel',
-          ])
-          ->withCount([
-              'personnel as accepted_by_me' => fn($q) => $q->where('profile_id', $profileId),
-              'personnel as personnel_count',
-          ]);
+                // Property number/serial/IP on inventory or parent component
+                $q->orWhereHas('inventory', function ($inv) use ($like) {
+                    $inv->where('property_number', 'like', $like)
+                        ->orWhere('serial_number', 'like', $like)
+                        ->orWhere('ip_address', 'like', $like)
+                        ->orWhereHas('parent_component', function ($pc) use ($like) {
+                            $pc->where('property_number', 'like', $like)
+                                ->orWhere('serial_number', 'like', $like)
+                                ->orWhere('ip_address', 'like', $like);
+                        });
+                });
+            });
+        }
 
-      if ($request->filled('tab')) {
-          switch ($request->tab) {
-              case 'accepted_by_me':
-                  $query->whereHas('personnel', fn($q) => $q->where('profile_id', $profileId));
-                  break;
+        $query = (clone $baseQuery)
+            ->with([
+                'profile',
+                'inventory',
+                'inventory.item_type',
+                'inventory.brand_model',
+                'inventory.parent_component',
+                'inventory.parent_component.item_type',
+                'inventory.parent_component.brand_model',
+                'agency',
+                'itService',
+                'solution',
+                'solution.author',
+                'personnel',
+            ])
+            ->withCount([
+                'personnel as accepted_by_me' => fn ($q) => $q->where('profile_id', $profileId),
+                'personnel as personnel_count',
+            ]);
 
-              case 'accepted_by_others':
-                  $query->whereHas('personnel', fn($q) => $q->where('profile_id', '!=', $profileId));
-                  break;
+        if ($request->filled('tab')) {
+            switch ($request->tab) {
+                case 'accepted_by_me':
+                    $query->whereHas('personnel', fn ($q) => $q->where('profile_id', $profileId));
+                    break;
 
-              case 'open':
-                  $query->whereIn('request_status', [TicketStatus::Open, TicketStatus::Reopened]);
-                  break;
+                case 'accepted_by_others':
+                    $query->whereHas('personnel', fn ($q) => $q->where('profile_id', '!=', $profileId));
+                    break;
 
-              case 'closed':
-                  $query->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled]);
-                  break;
-          }
-      }
+                case 'open':
+                    $query->whereIn('request_status', [TicketStatus::Open, TicketStatus::Reopened]);
+                    break;
 
-      if ($request->filled('query_status')) {
-          $query->where('query_status', $request->query_status);
-      }
+                case 'closed':
+                    $query->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled]);
+                    break;
+            }
+        }
 
-      $sortable = [
-          'ticket_number' => 'ticket_number',
-          'property_number' => 'property_number',   // special handling below
-          'full_name' => 'full_name',
-          'client' => 'client_name',
-          'query_status' => 'query_status',
-          'request_status' => 'request_status',
-          'priority' => 'priority',
-          'service_method' => 'service_method',
-          'date' => 'date',
-          'created_at' => 'created_at',
-      ];
+        if ($request->filled('query_status')) {
+            $query->where('query_status', $request->query_status);
+        }
 
-      if ($request->filled('sort')) {
-          $sortKey = $request->input('sort');
-          $order = $request->input('order', 'asc') === 'desc' ? 'desc' : 'asc';
+        $sortable = [
+            'ticket_number' => 'ticket_number',
+            'property_number' => 'property_number',   // special handling below
+            'full_name' => 'full_name',
+            'client' => 'client_name',
+            'query_status' => 'query_status',
+            'request_status' => 'request_status',
+            'complexity_level_id' => 'complexity_level_id',
+            'service_method' => 'service_method',
+            'date' => 'date',
+            'accepted_at' => 'accepted_at',
+            'resolved_at' => 'resolved_at',
+            'created_at' => 'created_at',
+        ];
 
-          if (isset($sortable[$sortKey])) {
-              if ($sortKey === 'property_number') {
-                  // sort via inventories.property_number
-                  $query->join('inventories', 'tickets.inventory_id', '=', 'inventories.id')
+        if ($request->filled('sort')) {
+            $sortKey = $request->input('sort');
+            $order = $request->input('order', 'asc') === 'desc' ? 'desc' : 'asc';
+
+            if (isset($sortable[$sortKey])) {
+                if ($sortKey === 'property_number') {
+                    // leftJoin, not join: an inner join here silently
+                    // dropped every ticket with no inventory_id (other-
+                    // agency tickets, or tickets whose inventory was since
+                    // deleted) from the entire list whenever this column
+                    // was sorted, not just reordered them.
+                    $query->leftJoin('inventories', 'tickets.inventory_id', '=', 'inventories.id')
                         ->orderBy('inventories.property_number', $order)
                         ->select('tickets.*');
-              } else {
-                  $query->orderBy($sortable[$sortKey], $order);
-              }
-          } else {
-              $query->latest();
-          }
-      } else {
-          $query->latest();
-      }
+                } else {
+                    $query->orderBy($sortable[$sortKey], $order);
+                }
+            } else {
+                $query->latest();
+            }
+        } else {
+            $query->latest();
+        }
 
-      $perPage = $request->input('per_page', 10);
-      $currentPage = $request->input('page', 1);
-      $tickets = $query
-          ->paginate($perPage, ['*'], 'page', $currentPage)
-          ->appends($request->query());
+        $perPage = $request->input('per_page', 10);
+        $currentPage = $request->input('page', 1);
+        $tickets = $query
+            ->paginate($perPage, ['*'], 'page', $currentPage)
+            ->appends($request->query());
 
-      $employeeMap = collect($hris->getEmployeesCached(10))
-        ->filter(fn ($e) => isset($e['id']))
-        ->keyBy(fn ($e) => (int) $e['id']);
+        try {
+            $employeeMap = collect($hris->getEmployeesCached(10))
+                ->filter(fn ($e) => isset($e['id']))
+                ->keyBy(fn ($e) => (int) $e['id']);
+        } catch (\Throwable $e) {
+            $hrisUnavailable = true;
+            $employeeMap = collect();
+        }
 
-      $request->attributes->set('employeeMap', $employeeMap);
+        $request->attributes->set('employeeMap', $employeeMap);
 
-      $counts = [
-          'all' => (clone $baseQuery)->count(),
-          'open' => (clone $baseQuery)->whereIn('request_status', [TicketStatus::Open, TicketStatus::Reopened])->count(),
-          'accepted_by_me' => (clone $baseQuery)->whereHas('personnel', fn($q) => $q->where('profile_id', $profileId))->count(),
-          'accepted_by_others' => (clone $baseQuery)->whereHas('personnel', fn($q) => $q->where('profile_id', '!=', $profileId))->count(),
-          'closed' => (clone $baseQuery)->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled])->count(),
-      ];
+        $counts = [
+            'all' => (clone $baseQuery)->count(),
+            'open' => (clone $baseQuery)->whereIn('request_status', [TicketStatus::Open, TicketStatus::Reopened])->count(),
+            'accepted_by_me' => (clone $baseQuery)->whereHas('personnel', fn ($q) => $q->where('profile_id', $profileId))->count(),
+            'accepted_by_others' => (clone $baseQuery)->whereHas('personnel', fn ($q) => $q->where('profile_id', '!=', $profileId))->count(),
+            'closed' => (clone $baseQuery)->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled])->count(),
+        ];
 
-      return response()->json([
-          'data' => TicketResource::collection($tickets),
-          'meta' => [
-              'total' => $tickets->total(),
-              'per_page' => $tickets->perPage(),
-              'current_page' => $tickets->currentPage(),
-              'last_page' => $tickets->lastPage(),
-              'counts' => $counts,
-          ],
-      ]);
+        return response()->json([
+            'data' => TicketResource::collection($tickets),
+            'meta' => [
+                'total' => $tickets->total(),
+                'per_page' => $tickets->perPage(),
+                'current_page' => $tickets->currentPage(),
+                'last_page' => $tickets->lastPage(),
+                'counts' => $counts,
+                'hris_unavailable' => $hrisUnavailable,
+            ],
+        ]);
     }
 
-    public function store(StoreTicketRequest $request) {
-      Gate::authorize('tickets.create');
-      
-      $data = $request->validated();
+    public function store(StoreTicketRequest $request)
+    {
+        Gate::authorize('tickets.create');
 
-      $data['ticket_number'] = Ticket::generateTicketNumber();
+        $data = $request->validated();
 
-      $ticket = Ticket::create($data);
+        $data['ticket_number'] = Ticket::generateTicketNumber();
 
-      return new TicketResource($ticket);
+        $ticket = Ticket::create($data);
+
+        return new TicketResource($ticket);
     }
 
-    public function update(UpdateTicketRequest $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
+    public function update(UpdateTicketRequest $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
 
-      $data = $request->validated();
+        $data = $request->validated();
 
-      $ticket->update($data);
+        $ticket->update($data);
 
-      return new TicketResource($ticket);
+        return new TicketResource($ticket);
     }
 
-    public function show(Ticket $ticket) {
+    public function show(Ticket $ticket)
+    {
         Gate::authorize('tickets.view');
 
         $profileId = Auth::user()->profile->id;
@@ -244,31 +274,34 @@ class TicketController extends Controller
         return TicketResource::make($ticket);
     }
 
-    public function destroy(Ticket $ticket) {
-      Gate::authorize('tickets.delete');
+    public function destroy(Ticket $ticket)
+    {
+        Gate::authorize('tickets.delete');
 
-      $ticket->delete();
-      
-      return new TicketResource($ticket);
+        $ticket->delete();
+
+        return new TicketResource($ticket);
     }
 
-    public function accept(Request $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $profile = Auth::user()->profile;
+    public function accept(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $profile = Auth::user()->profile;
 
-        if (!$profile) {
+        if (! $profile) {
             return response()->json(['error' => 'Profile not found.'], 404);
         }
 
         $alreadyAccepted = $ticket->personnel()->where('profile_id', $profile->id)->exists();
 
-        if (!$alreadyAccepted) {
+        if (! $alreadyAccepted) {
             $ticket->personnel()->attach($profile->id);
 
             if ($ticket->personnel()->count() === 1) {
                 $ticket->update([
                     'query_status' => TicketStatus::InProgress,
                     'request_status' => TicketStatus::Accepted,
+                    'accepted_at' => now(),
                 ]);
             }
         }
@@ -276,8 +309,8 @@ class TicketController extends Controller
         ProfileEngagementService::syncTicket($ticket);
 
         $existingPersonnel = $ticket->personnel()
-          ->where('profile_id', '!=', $request->user()->profile->id)
-          ->get();
+            ->where('profile_id', '!=', $request->user()->profile->id)
+            ->get();
 
         if ($existingPersonnel->isNotEmpty()) {
             $joinedProfile = $request->user()->profile;
@@ -289,18 +322,19 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
-    public function unaccept(Request $request, Ticket $ticket) {
+    public function unaccept(Request $request, Ticket $ticket)
+    {
         Gate::authorize('tickets.update');
 
         $profile = Auth::user()->profile;
 
-        if (!$profile) {
+        if (! $profile) {
             return response()->json(['error' => 'Profile not found.'], 404);
         }
 
         $isAccepted = $ticket->personnel()->where('profile_id', $profile->id)->exists();
 
-        if (!$isAccepted) {
+        if (! $isAccepted) {
             return response()->json([
                 'error' => 'You have not accepted this ticket.',
             ], 422);
@@ -312,6 +346,7 @@ class TicketController extends Controller
             $ticket->update([
                 'query_status' => TicketStatus::Queued,
                 'request_status' => TicketStatus::Open,
+                'accepted_at' => null,
             ]);
         }
 
@@ -320,61 +355,25 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
-    public function checkStock(Request $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $ticket->update([
-          'query_status' => TicketStatus::CheckingStock,
-      ]);
+    public function checkStock(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $ticket->update([
+            'query_status' => TicketStatus::CheckingStock,
+        ]);
 
-      // ?? Consider this action if while personnel is checking stock should be able to accept other tickets
+        ProfileEngagementService::syncTicket($ticket);
 
-      return new TicketResource($ticket);
+        // ?? Consider this action if while personnel is checking stock should be able to accept other tickets
+
+        return new TicketResource($ticket);
     }
 
-    public function awaitPart(Request $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $ticket->update([
-          'query_status' => TicketStatus::AwaitingPart,
-      ]);
-
-      ProfileEngagementService::syncTicket($ticket);
-
-      return new TicketResource($ticket);      
-    }
-
-    public function resolve(ResolveTicketRequest $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $data = $request->validated();
-
-      $data['query_status'] = TicketStatus::Resolved;
-      $data['request_status'] = TicketStatus::Closed;
-
-      $ticket->update($data);
-
-      ProfileEngagementService::syncTicket($ticket);
-
-      return new TicketResource($ticket);
-    }
-
-    public function cancel(Request $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $ticket->update([
-          'query_status' => TicketStatus::Cancelled,
-          'request_status' => TicketStatus::Closed,
-      ]);
-
-      ProfileEngagementService::syncTicket($ticket);
-
-      return new TicketResource($ticket);
-    }
-
-    public function reopen(Request $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $ticket->assessment()->delete();
-
-      $ticket->update([
-            'query_status' => TicketStatus::InProgress,
-            'request_status' => TicketStatus::Reopened,
+    public function awaitPart(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $ticket->update([
+            'query_status' => TicketStatus::AwaitingPart,
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
@@ -382,35 +381,86 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
-    public function assess(AssessTicketRequest $request, Ticket $ticket, HrisClientService $hris) {
+    public function resolve(ResolveTicketRequest $request, Ticket $ticket)
+    {
         Gate::authorize('tickets.update');
         $data = $request->validated();
 
-        // Resolve assessed_by — match by employee_id/employee_id_number, fallback to auth user name
-        $user           = Auth::user();
+        $data['query_status'] = TicketStatus::Resolved;
+        $data['request_status'] = TicketStatus::Closed;
+        $data['resolved_at'] = now();
+
+        $ticket->update($data);
+
+        ProfileEngagementService::syncTicket($ticket);
+
+        return new TicketResource($ticket);
+    }
+
+    public function cancel(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $ticket->update([
+            'query_status' => TicketStatus::Cancelled,
+            'request_status' => TicketStatus::Closed,
+        ]);
+
+        ProfileEngagementService::syncTicket($ticket);
+
+        return new TicketResource($ticket);
+    }
+
+    public function reopen(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $ticket->assessment()->delete();
+
+        $ticket->update([
+            'query_status' => TicketStatus::InProgress,
+            'request_status' => TicketStatus::Reopened,
+            // accepted_at is left untouched -- it records when the ticket
+            // was originally accepted, which reopening doesn't change.
+            // Only resolved_at is cleared, since the ticket is no longer
+            // resolved.
+            'resolved_at' => null,
+        ]);
+
+        ProfileEngagementService::syncTicket($ticket);
+
+        return new TicketResource($ticket);
+    }
+
+    public function assess(AssessTicketRequest $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $data = $request->validated();
+
+        $user = Auth::user();
         $user_profile_designation = $user?->profile?->designation ?? '';
-        $authEmployeeId = (string) ($user?->profile?->employee_id ?? '');
-
-        $authEmployee = collect($hris->getEmployees())
-            ->first(function ($e) use ($authEmployeeId) {
-                return (string) ($e['employee_id'] ?? $e['employee_id_number'] ?? $e['id'] ?? '') === $authEmployeeId;
-            });
-
         $assessedBy = $user->profile?->formatted_name ?? $user->name;
 
-        // Create or update assessment
-        $ticket->assessment()->updateOrCreate(
-            ['ticket_id' => $ticket->id],
-            [
-                ...$data,
-                'assessed_by' => $assessedBy,
-                'assessed_by_position' => $user_profile_designation,
-            ]
-        );
+        $payload = [
+            ...$data,
+            'assessed_by' => $assessedBy,
+            'assessed_by_position' => $user_profile_designation,
+        ];
+
+        // control_number is generated once, on first creation -- editing an
+        // existing assessment must never overwrite it.
+        $existingAssessment = $ticket->assessment;
+
+        if ($existingAssessment) {
+            $existingAssessment->update($payload);
+        } else {
+            $ticket->assessment()->create([
+                ...$payload,
+                'control_number' => TicketAssessment::generateControlNumber(),
+            ]);
+        }
 
         // Update ticket status
         $ticket->update([
-            'query_status'   => TicketStatus::Assessed,
+            'query_status' => TicketStatus::Assessed,
             'request_status' => TicketStatus::Closed,
         ]);
 
@@ -421,25 +471,31 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
-    public function setServiceMethod(SetTicketServiceMethodRequest $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $data = $request->validated();
+    public function setServiceMethod(SetTicketServiceMethodRequest $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $data = $request->validated();
 
-      $ticket->update($data);
+        $ticket->update($data);
 
-      return new TicketResource($ticket);
+        return new TicketResource($ticket);
     }
 
-    public function setReleaseDate(SetTicketReleaseDateRequest $request, Ticket $ticket) {
-      Gate::authorize('tickets.update');
-      $data = $request->validated();
+    public function setReleaseDate(SetTicketReleaseDateRequest $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.update');
+        $data = $request->validated();
 
-      $ticket->update($data);
+        $user = Auth::user();
+        $data['released_by'] = $user->profile?->formatted_name ?? $user->name;
 
-      return new TicketResource($ticket);
+        $ticket->update($data);
+
+        return new TicketResource($ticket);
     }
 
-    public function assessmentReport(Ticket $ticket, HrisClientService $hris, PdfImageService $pdfImages) {
+    public function assessmentReport(Ticket $ticket, HrisClientService $hris, PdfImageService $pdfImages)
+    {
         Gate::authorize('tickets.view');
 
         $ticket->load([
@@ -470,16 +526,22 @@ class TicketController extends Controller
             'agency',
         ]);
 
-        if (!$ticket->assessment) {
+        if (! $ticket->assessment) {
             return response()->json([
                 'message' => 'No assessment found for this ticket.',
             ], 404);
         }
 
-        // Resolve employee from HRIS.
-        $employeeMap = collect($hris->getEmployeesCached())
-            ->filter(fn ($employee) => isset($employee['id']))
-            ->keyBy(fn ($employee) => (int) $employee['id']);
+        // Resolve employee from HRIS -- if it's unreachable, the report
+        // should still generate (with employee/office details falling
+        // back to "—" below) rather than fail the whole download.
+        try {
+            $employeeMap = collect($hris->getEmployeesCached())
+                ->filter(fn ($employee) => isset($employee['id']))
+                ->keyBy(fn ($employee) => (int) $employee['id']);
+        } catch (\Throwable $e) {
+            $employeeMap = collect();
+        }
 
         $inventory = $ticket->inventory;
         $parentInventory = $inventory?->parent_component;
@@ -500,11 +562,11 @@ class TicketController extends Controller
             : (
                 $ticket->office_desc
                     ? $ticket->office_desc
-                        . ($ticket->office_code ? " ({$ticket->office_code})" : '')
+                        .($ticket->office_code ? " ({$ticket->office_code})" : '')
                     : (
                         $resolvedInventory?->office_name
                             ? $resolvedInventory->office_name
-                                . ($resolvedInventory->office_code
+                                .($resolvedInventory->office_code
                                     ? " ({$resolvedInventory->office_code})"
                                     : '')
                             : (data_get($employee, 'office_desc') ?? '—')
@@ -541,7 +603,7 @@ class TicketController extends Controller
                 ->map(function ($component) {
                     $componentBrandModel = $component->brand_model;
 
-                    if (!$componentBrandModel) {
+                    if (! $componentBrandModel) {
                         return null;
                     }
 
@@ -551,7 +613,7 @@ class TicketController extends Controller
                         $componentBrandModel->specification,
                     ], fn ($value) => filled($value));
 
-                    return !empty($parts)
+                    return ! empty($parts)
                         ? implode(' ', $parts)
                         : null;
                 })
@@ -570,7 +632,7 @@ class TicketController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (!$brandModel) {
+        if (! $brandModel) {
             $brandModelSource = $inventory?->brand_model
                 ?? $parentInventory?->brand_model;
 
@@ -581,7 +643,7 @@ class TicketController extends Controller
                     $brandModelSource->specification,
                 ], fn ($value) => filled($value));
 
-                $brandModel = !empty($parts)
+                $brandModel = ! empty($parts)
                     ? implode(' ', $parts)
                     : null;
             }
@@ -593,7 +655,7 @@ class TicketController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        if (!$brandModel) {
+        if (! $brandModel) {
             $fallbackSource = $inventory ?? $parentInventory;
 
             $parts = array_filter([
@@ -604,7 +666,7 @@ class TicketController extends Controller
                     ?? $fallbackSource?->description,
             ], fn ($value) => filled($value));
 
-            $brandModel = !empty($parts)
+            $brandModel = ! empty($parts)
                 ? implode(' ', $parts)
                 : null;
         }
@@ -616,7 +678,7 @@ class TicketController extends Controller
         */
 
         if ($ticket->assessment->is_set) {
-            $brandModel = ($brandModel ?: '—') . ' (Set)';
+            $brandModel = ($brandModel ?: '—').' (Set)';
         }
 
         /*
@@ -626,7 +688,7 @@ class TicketController extends Controller
         */
 
         if ($ticket->assessment->is_set) {
-            $brandModel = ($brandModel ?: '—') . ' (Set)';
+            $brandModel = ($brandModel ?: '—').' (Set)';
         }
 
         // Item type — inventory first, then parent, then ticket.
@@ -636,28 +698,36 @@ class TicketController extends Controller
             ?? '—';
 
         $dateAcquired = $resolvedInventory?->date_acquired
-            ? \Carbon\Carbon::parse($resolvedInventory->date_acquired)
+            ? Carbon::parse($resolvedInventory->date_acquired)
                 ->format('F d, Y')
             : '—';
 
         $data = [
-            'ticket'        => $ticket,
-            'assessment'    => $ticket->assessment,
+            'ticket' => $ticket,
+            'assessment' => $ticket->assessment,
             'date' => $ticket->assessment->created_at?->format('F d, Y') ?? '—',
-            'control_no'    => $ticket->ticket_number,
-            'office'        => $office,
-            'item_name'     => $itemType,
-            'property_no'   => $inventory?->property_number
+            'control_no' => $ticket->assessment->control_number ?? $ticket->ticket_number,
+            'office' => $office,
+            'item_name' => $itemType,
+            'property_no' => $inventory?->property_number
                 ?? $parentInventory?->property_number
                 ?? '—',
             'date_acquired' => $dateAcquired,
-            'issued_to'     => $issuedTo,
-            'brand_model'   => $brandModel ?? '—',
+            'issued_to' => $issuedTo,
+            'brand_model' => $brandModel ?? '—',
             'serial_number' => $inventory?->serial_number
                 ?? $parentInventory?->serial_number
                 ?? '—',
-            'concern'       => $ticket->concern,
-            'components'    => $ticket->assessment->components ?? [],
+            'concern' => $ticket->concern,
+            'components' => $ticket->assessment->components ?? [],
+            'component_remarks' => $ticket->assessment->component_remarks ?? [],
+            // These labels must match components/tickets/AssessModal.vue's
+            // SYSTEM_UNIT_PARTS/PERIPHERALS/LAPTOP_PARTS/MOBILE_PARTS
+            // exactly (including the "(Category)" suffixes on labels that
+            // repeat across categories) -- $components is a flat array of
+            // the checked labels, matched here with a plain in_array(), so
+            // a mismatched label (e.g. this used to say "OTHERS" while the
+            // modal stores "OTHERS (System Unit)") never shows as checked.
             'system_unit_parts' => [
                 'PROCESSOR',
                 'RAM/ Memory Module',
@@ -668,7 +738,7 @@ class TicketController extends Controller
                 'MOTHERBOARD',
                 'OPTICAL DRIVE',
                 'MONITOR',
-                'OTHERS',
+                'OTHERS (System Unit)',
             ],
             'peripherals' => [
                 'KEYBOARD',
@@ -680,7 +750,34 @@ class TicketController extends Controller
                 'PRINTER',
                 'SCANNER',
                 'Router / Switch',
-                'OTHERS',
+                'OTHERS (Peripherals)',
+            ],
+            'laptop_parts' => [
+                'BATTERY (Laptop)',
+                'KEYBOARD (Laptop)',
+                'TOUCHPAD',
+                'LCD/SCREEN',
+                'HINGE',
+                'RAM/ Memory Module (Laptop)',
+                'SOLID STATE DRIVE (Laptop)',
+                'HARD DISK (Laptop)',
+                'CHARGER/ADAPTER (Laptop)',
+                'WEBCAM',
+                'COOLING FAN',
+                'MOTHERBOARD (Laptop)',
+                'OTHERS (Laptop)',
+            ],
+            'mobile_parts' => [
+                'BATTERY (Mobile)',
+                'SCREEN/DIGITIZER',
+                'CHARGING PORT',
+                'CHARGER/ADAPTER (Mobile)',
+                'SIM TRAY',
+                'CAMERA',
+                'SPEAKER (Mobile)',
+                'MICROPHONE',
+                'BUTTONS (Power/Volume)',
+                'OTHERS (Mobile)',
             ],
             ...$pdfImages->agencyLogos(),
         ];
@@ -689,13 +786,13 @@ class TicketController extends Controller
             ->setPaper('a4', 'portrait');
 
         $filename = 'Assessment-'
-            . $ticket->ticket_number
-            . '-'
-            . now()->format('Y-m-d_Hi')
-            . '.pdf';
+            .$ticket->ticket_number
+            .'-'
+            .now()->format('Y-m-d_Hi')
+            .'.pdf';
 
         return $pdf->download($filename, [
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);
     }
 
@@ -729,6 +826,55 @@ class TicketController extends Controller
                 ->where('query_status', TicketStatus::Resolved->value)
                 ->whereDate('updated_at', today())
                 ->count(),
+
+            'trend' => $this->dashboardTrend(),
+
+            'breakdown' => Ticket::query()
+                ->selectRaw('query_status, COUNT(*) as count')
+                ->groupBy('query_status')
+                ->pluck('count', 'query_status'),
         ]);
+    }
+
+    /**
+     * Daily created-vs-resolved counts for the last 14 days (inclusive of
+     * today), for the dashboard trend chart. `resolved_at` (not
+     * `updated_at`) is used for the resolved series -- it's a dedicated
+     * timestamp set only by TicketController::resolve() and cleared on
+     * reopen, so it won't be skewed by unrelated field edits touching
+     * `updated_at` the way the existing "Resolved Today" KPI card is.
+     * MySQL's grouped query silently omits days with zero rows, so the
+     * gaps are filled with 0 in PHP after the fact.
+     */
+    private function dashboardTrend(): array
+    {
+        $since = Carbon::today()->subDays(13);
+
+        $createdByDay = Ticket::query()
+            ->where('created_at', '>=', $since)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as count')
+            ->groupBy('day')
+            ->pluck('count', 'day');
+
+        $resolvedByDay = Ticket::query()
+            ->whereNotNull('resolved_at')
+            ->where('resolved_at', '>=', $since)
+            ->selectRaw('DATE(resolved_at) as day, COUNT(*) as count')
+            ->groupBy('day')
+            ->pluck('count', 'day');
+
+        $trend = [];
+
+        for ($i = 13; $i >= 0; $i--) {
+            $day = Carbon::today()->subDays($i)->toDateString();
+
+            $trend[] = [
+                'date' => $day,
+                'created' => (int) ($createdByDay[$day] ?? 0),
+                'resolved' => (int) ($resolvedByDay[$day] ?? 0),
+            ];
+        }
+
+        return $trend;
     }
 }

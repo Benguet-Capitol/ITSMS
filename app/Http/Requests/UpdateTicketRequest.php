@@ -26,7 +26,7 @@ class UpdateTicketRequest extends FormRequest
             'office_code' => 'nullable|string|max:255',
             'office_desc' => 'nullable|string|max:255',
             'concern' => 'required|string',
-            'priority' => 'nullable|string',
+            'complexity_level_id' => 'nullable|exists:ticket_complexity_levels,id',
             'contact_number' => 'nullable|string',
             'is_other_agency' => 'boolean',
             'full_name' => 'nullable|string',
@@ -62,7 +62,7 @@ class UpdateTicketRequest extends FormRequest
                 }
             }
 
-            if (!$inventoryId && !$isOtherAgency && !$officeId) {
+            if (! $inventoryId && ! $isOtherAgency && ! $officeId) {
                 $validator->errors()->add(
                     'office_id',
                     'Office is required when no inventory is selected.'

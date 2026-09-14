@@ -11,79 +11,84 @@ use Illuminate\Support\Facades\Gate;
 
 class ItServiceController extends Controller
 {
-    public function index(Request $request) {
-      Gate::authorize('it_services.view');
+    public function index(Request $request)
+    {
+        Gate::authorize('it_services.view');
 
-      $query = ItService::query();
+        $query = ItService::query();
 
-      if($request->has('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use($search) {
-          $q->where('name', 'LIKE', "%{$search}%")
-          ->orWhere('description', 'LIKE', "%{$search}%")
-          ->orWhere('code', 'LIKE', "%{$search}%");
-        });
-      }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('description', 'LIKE', "%{$search}%")
+                    ->orWhere('code', 'LIKE', "%{$search}%");
+            });
+        }
 
-      if ($request->has('classification')) {
-        $query->where('classification', $request->classification);
-      }
+        // Sorting (default to ID) -- whitelisted against real, sortable
+        // columns so an arbitrary `sort` query param can't be used to probe
+        // schema/column names or order by something not meant to be exposed.
+        $sortable = ['id', 'name', 'code', 'created_at', 'updated_at'];
 
-      // Sorting (default to ID)
-      if ($request->has('sort')) {
-        $order = $request->input('order', 'asc');
-        $query->orderBy($request->sort, $order);
-      }
+        if ($request->filled('sort') && in_array($request->sort, $sortable, true)) {
+            $order = $request->input('order') === 'desc' ? 'desc' : 'asc';
+            $query->orderBy($request->sort, $order);
+        }
 
-      // Paginate with customizable per-page count
-      $itServices = $query->paginate($request->input('per_page', 5))->appends($request->query());
+        // Paginate with customizable per-page count
+        $itServices = $query->paginate($request->input('per_page', 5))->appends($request->query());
 
-      return response()->json([
-          'data' => ItServiceResource::collection($itServices),
-          'meta' => [
-              'total' => $itServices->total(),
-              'per_page' => $itServices->perPage(),
-              'current_page' => $itServices->currentPage(),
-              'last_page' => $itServices->lastPage(),
-          ]
-      ]);
+        return response()->json([
+            'data' => ItServiceResource::collection($itServices),
+            'meta' => [
+                'total' => $itServices->total(),
+                'per_page' => $itServices->perPage(),
+                'current_page' => $itServices->currentPage(),
+                'last_page' => $itServices->lastPage(),
+            ],
+        ]);
     }
 
-    public function store(StoreItServiceRequest $request) {
-      Gate::authorize('it_services.create');
-      
-      $data = $request->validated();
+    public function store(StoreItServiceRequest $request)
+    {
+        Gate::authorize('it_services.create');
 
-      $itService = ItService::create($data);
+        $data = $request->validated();
 
-      return new ItServiceResource($itService);
+        $itService = ItService::create($data);
+
+        return new ItServiceResource($itService);
     }
 
-    public function update(UpdateItServiceRequest $request, ItService $itService) {
-      Gate::authorize('it_services.update');
+    public function update(UpdateItServiceRequest $request, ItService $itService)
+    {
+        Gate::authorize('it_services.update');
 
-      $data = $request->validated();
+        $data = $request->validated();
 
-      $itService->update($data);
+        $itService->update($data);
 
-      return new ItServiceResource($itService);
+        return new ItServiceResource($itService);
     }
 
-    public function destroy(ItService $itService) {
-      Gate::authorize('it_services.delete');
+    public function destroy(ItService $itService)
+    {
+        Gate::authorize('it_services.delete');
 
-      $itService->delete();
-      
-      return new ItServiceResource($itService);
+        $itService->delete();
+
+        return new ItServiceResource($itService);
     }
 
-    public function select() {
-      Gate::authorize('it_services.select');
-      
-      $itServices = ItService::all();
+    public function select()
+    {
+        Gate::authorize('it_services.select');
 
-      return response()->json([
-        'data' => ItServiceResource::collection($itServices)
-      ]);
+        $itServices = ItService::all();
+
+        return response()->json([
+            'data' => ItServiceResource::collection($itServices),
+        ]);
     }
 }

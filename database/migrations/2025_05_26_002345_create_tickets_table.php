@@ -14,20 +14,20 @@ return new class extends Migration
         Schema::create('tickets', function (Blueprint $table) {
             $table->id();
             $table->foreignId('profile_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('inventory_id')->nullable()
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->foreignId('agency_id')->nullable()
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->foreignId('it_service_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('item_type_id')->nullable()
-              ->constrained()
-              ->nullOnDelete();
+                ->constrained()
+                ->nullOnDelete();
             $table->foreignId('solution_id')->nullable()->constrained()->nullOnDelete();
             $table->string('ticket_number')->unique();
             $table->string('full_name')->nullable();
@@ -46,7 +46,6 @@ return new class extends Migration
             $table->tinyInteger('efficiency')->nullable()->comment('1-5 rating for efficiency');
             $table->tinyInteger('timeliness')->nullable()->comment('1-5 rating for timeliness');
             // $table->tinyInteger('rating')->nullable()->comment('Average rating (1-5, rounded)');
-
 
             $table->timestamps();
         });

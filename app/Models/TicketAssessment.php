@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
 class TicketAssessment extends Model
 {
     protected $fillable = [
         'ticket_id',
+        'control_number',
         'findings',
         'recommendations',
         'replacement_available',
@@ -15,6 +17,7 @@ class TicketAssessment extends Model
         'acquisition_cost',
         'is_set',
         'components',
+        'component_remarks',
         'reviewed_by',
         'assessed_by',
         'reviewed_by_position',
@@ -22,13 +25,28 @@ class TicketAssessment extends Model
     ];
 
     protected $casts = [
-        'components'             => 'array',
-        'replacement_available'  => 'boolean',
-        'acquisition_cost'       => 'decimal:2',
+        'components' => 'array',
+        'component_remarks' => 'array',
+        'replacement_available' => 'boolean',
+        'acquisition_cost' => 'decimal:2',
         'is_set' => 'boolean',
     ];
 
-    public function ticket() {
+    public function ticket()
+    {
         return $this->belongsTo(Ticket::class);
+    }
+
+    public static function generateControlNumber(): string
+    {
+        $now = Carbon::now();
+
+        $count = self::whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
+            ->count();
+
+        $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+
+        return "{$now->format('Y-m')}-{$serial}"; // 2025-10-0001
     }
 }

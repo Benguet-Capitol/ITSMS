@@ -13,11 +13,11 @@ return new class extends Migration
     {
         Schema::create('ticket_personnel', function (Blueprint $table) {
             $table->foreignId('ticket_id')
-            ->constrained()
-            ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('profile_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->timestamps();
         });
     }

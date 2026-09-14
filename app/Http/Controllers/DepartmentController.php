@@ -2,86 +2,90 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Department;
-use App\Http\Resources\DepartmentResource;
 use App\Http\Requests\StoreDepartmentRequest;
 use App\Http\Requests\UpdateDepartmentRequest;
+use App\Http\Resources\DepartmentResource;
+use App\Models\Department;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class DepartmentController extends Controller
 {
-    public function index(Request $request) {
-      Gate::authorize('departments.view');
+    public function index(Request $request)
+    {
+        Gate::authorize('departments.view');
 
-      $query = Department::query();
+        $query = Department::query();
 
-      if($request->has('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use($search) {
-          $q->where('name', 'LIKE', "%{$search}%")
-          ->orWhere('full_name', 'LIKE', "%{$search}%")
-          ->orWhere('abbreviation', 'LIKE', "%{$search}%");
-        });
-      }
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('full_name', 'LIKE', "%{$search}%")
+                    ->orWhere('abbreviation', 'LIKE', "%{$search}%");
+            });
+        }
 
-      // Sorting (default to ID)
-      if ($request->has('sort')) {
-        $order = $request->input('order', 'asc');
-        $query->orderBy($request->sort, $order);
-      }
+        // Sorting (default to ID)
+        if ($request->has('sort')) {
+            $order = $request->input('order', 'asc');
+            $query->orderBy($request->sort, $order);
+        }
 
-      // Paginate with customizable per-page count
-      $departments = $query->paginate($request->input('per_page', 5))->appends($request->query());
+        // Paginate with customizable per-page count
+        $departments = $query->paginate($request->input('per_page', 5))->appends($request->query());
 
-      return response()->json([
-          'data' => DepartmentResource::collection($departments),
-          'meta' => [
-              'total' => $departments->total(),
-              'per_page' => $departments->perPage(),
-              'current_page' => $departments->currentPage(),
-              'last_page' => $departments->lastPage(),
-          ]
-      ]);
+        return response()->json([
+            'data' => DepartmentResource::collection($departments),
+            'meta' => [
+                'total' => $departments->total(),
+                'per_page' => $departments->perPage(),
+                'current_page' => $departments->currentPage(),
+                'last_page' => $departments->lastPage(),
+            ],
+        ]);
 
     }
 
-    public function store(StoreDepartmentRequest $request) {
-      Gate::authorize('departments.create');
-      
-      $data = $request->validated();
+    public function store(StoreDepartmentRequest $request)
+    {
+        Gate::authorize('departments.create');
 
-      $department = Department::create($data);
+        $data = $request->validated();
 
-      return new DepartmentResource($department);
+        $department = Department::create($data);
+
+        return new DepartmentResource($department);
     }
 
-    public function update(UpdateDepartmentRequest $request, Department $department) {
-      Gate::authorize('departments.update');
+    public function update(UpdateDepartmentRequest $request, Department $department)
+    {
+        Gate::authorize('departments.update');
 
-      $data = $request->validated();
+        $data = $request->validated();
 
-      $department->update($data);
+        $department->update($data);
 
-      return new DepartmentResource($department);
+        return new DepartmentResource($department);
     }
 
-    public function destroy(Department $department) {
-      Gate::authorize('departments.delete');
+    public function destroy(Department $department)
+    {
+        Gate::authorize('departments.delete');
 
-      $department->delete();
-      
-      return new DepartmentResource($department);
+        $department->delete();
+
+        return new DepartmentResource($department);
     }
 
-    public function select() {
-      Gate::authorize('departments.select');
-      
-      $departments = Department::all();
+    public function select()
+    {
+        Gate::authorize('departments.select');
 
-      return response()->json([
-        'data' => DepartmentResource::collection($departments)
-      ]);
+        $departments = Department::all();
+
+        return response()->json([
+            'data' => DepartmentResource::collection($departments),
+        ]);
     }
-
 }

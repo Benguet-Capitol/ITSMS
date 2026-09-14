@@ -14,11 +14,11 @@ return new class extends Migration
         Schema::create('it_supplies', function (Blueprint $table) {
             $table->id();
             $table->foreignId('brand_model_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->foreignId('measurement_unit_id')
-              ->constrained()
-              ->cascadeOnDelete();
+                ->constrained()
+                ->cascadeOnDelete();
             $table->text('description')->nullable();
             $table->string('item_number')->nullable();
             $table->string('stock_number')->nullable();

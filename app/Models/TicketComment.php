@@ -10,11 +10,13 @@ class TicketComment extends Model
         'comment',
     ];
 
-    public function profile() {
-      return $this->belongsTo(Profile::class);
+    public function profile()
+    {
+        return $this->belongsTo(Profile::class);
     }
 
-    public function ticket() {
-      return $this->belongsTo(Ticket::class);
+    public function ticket()
+    {
+        return $this->belongsTo(Ticket::class);
     }
 }

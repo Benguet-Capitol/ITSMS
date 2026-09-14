@@ -39,17 +39,17 @@ class OtherItServiceRequest extends Model
     ];
 
     protected $casts = [
-        'date_of_request'              => 'date',
-        'date_received'                => 'date',
-        'feedback_date'                => 'date',
-        'service_printing'             => 'boolean',
+        'date_of_request' => 'date',
+        'date_received' => 'date',
+        'feedback_date' => 'date',
+        'service_printing' => 'boolean',
         'service_information_material' => 'boolean',
-        'service_program_paper'        => 'boolean',
-        'service_brochure'             => 'boolean',
-        'service_iec_material'         => 'boolean',
-        'service_handbook'             => 'boolean',
-        'service_certificates'         => 'boolean',
-        'service_others'               => 'boolean',
-        'service_laptop_tv_setup'      => 'boolean',
+        'service_program_paper' => 'boolean',
+        'service_brochure' => 'boolean',
+        'service_iec_material' => 'boolean',
+        'service_handbook' => 'boolean',
+        'service_certificates' => 'boolean',
+        'service_others' => 'boolean',
+        'service_laptop_tv_setup' => 'boolean',
     ];
 }

@@ -2,11 +2,10 @@
 
 namespace App\Notifications;
 
+use App\Models\Ticket;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use App\Models\Ticket;
 
 class TicketCreatedNotification extends Notification
 {
@@ -49,7 +48,7 @@ class TicketCreatedNotification extends Notification
         return (new MailMessage)
             ->subject("New Ticket #{$this->ticket->id}")
             ->line("A new ticket has been created: {$this->ticket->concern}")
-            ->when($this->isPriorityMatch, fn($mail) => $mail->line('This ticket is in your assigned office/agency.'))
+            ->when($this->isPriorityMatch, fn ($mail) => $mail->line('This ticket is in your assigned office/agency.'))
             ->action('View Ticket', url("/tickets/{$this->ticket->id}"));
     }
 

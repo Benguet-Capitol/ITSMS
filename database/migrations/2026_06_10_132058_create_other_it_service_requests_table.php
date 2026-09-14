@@ -44,7 +44,7 @@ return new class extends Migration
             $table->string('feedback_name')->nullable();
             $table->date('feedback_date')->nullable();
             $table->string('status')->default('pending');
-            
+
             $table->timestamps();
         });
     }

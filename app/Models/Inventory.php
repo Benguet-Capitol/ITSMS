@@ -2,10 +2,25 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Inventory extends Model
 {
+    use HasFactory;
+
+    protected static function booted(): void
+    {
+        // public_id is the safe, non-guessable identifier external
+        // surfaces (Sprint 8's QR codes) reference instead of the raw
+        // sequential id -- generated once here rather than mass-
+        // assignable, so it can never be set/overridden via request input.
+        static::creating(function (Inventory $inventory) {
+            $inventory->public_id ??= (string) Str::ulid();
+        });
+    }
+
     protected $with = ['brand_model', 'parent_component', 'item_type', 'internal_components'];
 
     protected $casts = [
@@ -40,65 +55,77 @@ class Inventory extends Model
         'status',
     ];
 
-    public function brand_model() {
-      return $this->belongsTo(BrandModel::class);
+    public function brand_model()
+    {
+        return $this->belongsTo(BrandModel::class);
     }
 
     // public function employee() {
     //   return $this->belongsTo(Employee::class, 'employee_id');
     // }
 
-    public function parent_component() {
-      return $this->belongsTo(Inventory::class, 'parent_component_id');
+    public function parent_component()
+    {
+        return $this->belongsTo(Inventory::class, 'parent_component_id');
     }
 
-    public function item_type() {
-      return $this->belongsTo(ItemType::class);
+    public function item_type()
+    {
+        return $this->belongsTo(ItemType::class);
     }
 
-    public function internal_components() {
-      return $this->hasMany(InventoryInternalComponent::class);
+    public function internal_components()
+    {
+        return $this->hasMany(InventoryInternalComponent::class);
     }
 
-    public function getComputedBrandModelSearchAttribute(): ?string {
-      if (! $this->relationLoaded('item_type')) {
-          return null;
-      }
+    public function getComputedBrandModelSearchAttribute(): ?string
+    {
+        if (! $this->relationLoaded('item_type')) {
+            return null;
+        }
 
-      $type = $this->item_type?->type;
+        $type = $this->item_type?->type;
 
-      $brandName = $this->relationLoaded('brand_model')
-          ? $this->brand_model?->brand?->name
-          : null;
+        $brandName = $this->relationLoaded('brand_model')
+            ? $this->brand_model?->brand?->name
+            : null;
 
-      return $brandName
-          ? "{$brandName} {$type}"
-          : $type;
+        return $brandName
+            ? "{$brandName} {$type}"
+            : $type;
     }
 
-    public function getEmployeeFullNameAttribute(): ?string {
+    public function getEmployeeFullNameAttribute(): ?string
+    {
         // If controller/resource attached HRIS employee payload
         $fullname = data_get($this, 'employee.fullname');
-        if ($fullname) return $fullname;
+        if ($fullname) {
+            return $fullname;
+        }
 
         // Fallback: parent component (if it also got attached)
         $parentFullname = data_get($this, 'parent_component.employee.fullname');
-        if ($parentFullname) return $parentFullname;
+        if ($parentFullname) {
+            return $parentFullname;
+        }
 
         return null;
     }
 
-    public function getComputedBrandModelAttribute() {
-      // Prefer the loaded relation if available
-      if ($this->relationLoaded('brand_model') && $this->brand_model) {
-          return $this->brand_model;
-      }
+    public function getComputedBrandModelAttribute()
+    {
+        // Prefer the loaded relation if available
+        if ($this->relationLoaded('brand_model') && $this->brand_model) {
+            return $this->brand_model;
+        }
 
-      // Otherwise fallback to item_type->brand_model
-      return $this->item_type?->brand_model;
+        // Otherwise fallback to item_type->brand_model
+        return $this->item_type?->brand_model;
     }
 
-    public function getResolvedOfficeNameAttribute(): ?string {
+    public function getResolvedOfficeNameAttribute(): ?string
+    {
         return $this->office_name
             ?: $this->parent_component?->office_name;
     }

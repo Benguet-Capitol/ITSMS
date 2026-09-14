@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
-use App\Enums\TicketStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Profile extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'user_id',
         'display_name',
@@ -24,52 +26,53 @@ class Profile extends Model
         'name' => 'array',
     ];
 
-    const STATUS_ONLINE = 'online';
-    const STATUS_OFFLINE = 'offline';
-    const STATUS_BUSY = 'busy';
+    public const STATUS_ONLINE = 'online';
 
-    const ENGAGEMENT_READY = 'ready';
-    const ENGAGEMENT_BUSY = 'busy';
+    public const STATUS_IDLE = 'idle';
 
-    public function hasActiveTickets() {
-      return $this->ticketPersonnel()
-          ->wherePivotNotIn('status', ['resolved', 'cancelled']) // adjust if you have ticket status on pivot
-          ->whereIn('tickets.request_status', [
-              TicketStatus::Accepted,
-              TicketStatus::InProgress,
-          ])
-          ->exists();
-    }
+    public const STATUS_OFFLINE = 'offline';
 
-     public function user() {
+    public const ENGAGEMENT_READY = 'ready';
+
+    public const ENGAGEMENT_BUSY = 'busy';
+
+    public function user()
+    {
         return $this->belongsTo(User::class);
     }
 
-    public function ticketPersonnel() {
+    public function ticketPersonnel()
+    {
         return $this->belongsToMany(Ticket::class, 'ticket_personnel', 'profile_id', 'ticket_id');
     }
 
-    public function solutions() {
+    public function solutions()
+    {
         return $this->hasMany(Solution::class, 'author_id');
     }
 
-    public function departments() {
+    public function departments()
+    {
         return $this->belongsToMany(Department::class, 'profile_department');
     }
 
-    public function agencies() {
+    public function agencies()
+    {
         return $this->belongsToMany(Agency::class, 'profile_agency');
     }
 
-    public function profileOffices() {
+    public function profileOffices()
+    {
         return $this->hasMany(ProfileOffice::class);
     }
 
-    public function getOfficeIdsAttribute(): array {
+    public function getOfficeIdsAttribute(): array
+    {
         return $this->profileOffices->pluck('office_id')->toArray();
     }
 
-    public function getOfficesAssignedAttribute(): array {
+    public function getOfficesAssignedAttribute(): array
+    {
         return $this->profileOffices->map(function ($office) {
             return [
                 'id' => $office->office_id,
@@ -80,17 +83,17 @@ class Profile extends Model
         })->toArray();
     }
 
-    public function getFormattedNameAttribute(): string {
-        $name    = $this->name ?? [];
-        $first   = strtoupper(trim($name['firstname'] ?? ''));
-        $middle  = strtoupper(trim($name['middlename'] ?? ''));
-        $last    = strtoupper(trim($name['lastname'] ?? ''));
-        $suffix  = trim($name['suffix'] ?? '');
+    public function getFormattedNameAttribute(): string
+    {
+        $name = $this->name ?? [];
+        $first = strtoupper(trim($name['firstname'] ?? ''));
+        $middle = strtoupper(trim($name['middlename'] ?? ''));
+        $last = strtoupper(trim($name['lastname'] ?? ''));
+        $suffix = trim($name['suffix'] ?? '');
 
-        $middleInitial = $middle ? strtoupper($middle[0]) . '.' : '';
-        $suffixPart    = $suffix ? ', ' . strtoupper(ltrim($suffix)) : '';
+        $middleInitial = $middle ? strtoupper($middle[0]).'.' : '';
+        $suffixPart = $suffix ? ', '.strtoupper(ltrim($suffix)) : '';
 
         return trim("{$first} {$middleInitial} {$last}{$suffixPart}");
     }
-
 }

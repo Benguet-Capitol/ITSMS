@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\PdfImageService;
 use App\Exports\InventoryReportExport;
 use App\Models\Inventory;
 use App\Models\ItemType;
 use App\Services\HrisClientService;
+use App\Services\PdfImageService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -16,84 +16,86 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class InventoryReportController extends Controller
 {
-    public function exportExcel(Request $request, HrisClientService $hris) {
-      Gate::authorize('inventories.report');
-      
-      try {
-          $rows = $this->getReportRows($request, $hris);
+    public function exportExcel(Request $request, HrisClientService $hris)
+    {
+        Gate::authorize('inventories.report');
 
-          $employees = collect($hris->getEmployeesCached());
-          $itemType  = ItemType::find($request->input('item_type'));
-          $employee  = $employees->firstWhere('id', (int) $request->input('employee'));
+        try {
+            $rows = $this->getReportRows($request, $hris);
 
-          $officeDesc = null;
-          $officeCode = null;
+            $employees = collect($hris->getEmployeesCached());
+            $itemType = ItemType::find($request->input('item_type'));
+            $employee = $employees->firstWhere('id', (int) $request->input('employee'));
 
-          if ($request->filled('office')) {
-              $officeId = (string) $request->input('office');
+            $officeDesc = null;
+            $officeCode = null;
 
-              $matchedEmployee = $employees->first(
-                  fn ($e) => (string) data_get($e, 'office_id') === $officeId
-              );
+            if ($request->filled('office')) {
+                $officeId = (string) $request->input('office');
 
-              $officeDesc = data_get($matchedEmployee, 'office_desc');
-              $officeCode = data_get($matchedEmployee, 'office_code');
-          }
+                $matchedEmployee = $employees->first(
+                    fn ($e) => (string) data_get($e, 'office_id') === $officeId
+                );
 
-          $filters = [
-              'item_type' => $itemType?->type ?? 'All',
-              'employee'  => data_get($employee, 'fullname')
-                  ?: data_get($employee, 'full_name')
-                  ?: 'All',
-              'office'    => $officeDesc ?: 'All',
-              'status'    => $this->cleanPdfText($request->input('status')) ?: 'All',
-          ];
+                $officeDesc = data_get($matchedEmployee, 'office_desc');
+                $officeCode = data_get($matchedEmployee, 'office_code');
+            }
 
-          $generatedAt = now()->format('F d, Y h:i A');
+            $filters = [
+                'item_type' => $itemType?->type ?? 'All',
+                'employee' => data_get($employee, 'fullname')
+                    ?: data_get($employee, 'full_name')
+                    ?: 'All',
+                'office' => $officeDesc ?: 'All',
+                'status' => $this->cleanPdfText($request->input('status')) ?: 'All',
+            ];
 
-          // Build filename
-          $filenameParts = ['Inventory-Report'];
+            $generatedAt = now()->format('F d, Y h:i A');
 
-          if (!empty($officeCode)) {
-              $filenameParts[] = $officeCode;
-          }
-          if (!empty($filters['employee']) && $filters['employee'] !== 'All') {
-              $filenameParts[] = $filters['employee'];
-          }
-          if (!empty($filters['item_type']) && $filters['item_type'] !== 'All') {
-              $filenameParts[] = $filters['item_type'];
-          }
-          if (!empty($filters['status']) && $filters['status'] !== 'All') {
-              $filenameParts[] = $filters['status'];
-          }
+            // Build filename
+            $filenameParts = ['Inventory-Report'];
 
-          $filenameParts[] = now()->format('Y-m-d_Hi');
+            if (! empty($officeCode)) {
+                $filenameParts[] = $officeCode;
+            }
+            if (! empty($filters['employee']) && $filters['employee'] !== 'All') {
+                $filenameParts[] = $filters['employee'];
+            }
+            if (! empty($filters['item_type']) && $filters['item_type'] !== 'All') {
+                $filenameParts[] = $filters['item_type'];
+            }
+            if (! empty($filters['status']) && $filters['status'] !== 'All') {
+                $filenameParts[] = $filters['status'];
+            }
 
-          $filename = implode('_', array_map(
-              fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
-              $filenameParts
-          )) . '.xlsx';
+            $filenameParts[] = now()->format('Y-m-d_Hi');
 
-          return Excel::download(
-              new InventoryReportExport($rows, $filters, $generatedAt),
-              $filename
-          );
+            $filename = implode('_', array_map(
+                fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
+                $filenameParts
+            )).'.xlsx';
 
-      } catch (\Throwable $e) {
-          Log::error('Inventory Excel export failed', [
-              'message' => $e->getMessage(),
-              'line'    => $e->getLine(),
-              'file'    => $e->getFile(),
-          ]);
+            return Excel::download(
+                new InventoryReportExport($rows, $filters, $generatedAt),
+                $filename
+            );
 
-          return response()->json([
-              'message' => 'Failed to generate Excel report.',
-              'error'   => $e->getMessage(),
-          ], 500);
-      }
+        } catch (\Throwable $e) {
+            Log::error('Inventory Excel export failed', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to generate Excel report.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
-    public function exportPdf(Request $request, HrisClientService $hris, PdfImageService $pdfImages) {
+    public function exportPdf(Request $request, HrisClientService $hris, PdfImageService $pdfImages)
+    {
         Gate::authorize('inventories.report');
 
         try {
@@ -146,12 +148,12 @@ class InventoryReportController extends Controller
             ];
 
             $summary = collect($rows)
-              ->groupBy('item_type')
-              ->map(fn ($items) => [
-                  'count'    => count($items),
-                  'obsolete' => collect($items)->filter(fn ($r) => $r['is_obsolete'])->count(),
-              ])
-              ->sortKeys();
+                ->groupBy('item_type')
+                ->map(fn ($items) => [
+                    'count' => count($items),
+                    'obsolete' => collect($items)->filter(fn ($r) => $r['is_obsolete'])->count(),
+                ])
+                ->sortKeys();
 
             $customPaper = [0, 0, 576, 936];
 
@@ -166,23 +168,23 @@ class InventoryReportController extends Controller
 
             $filenameParts = ['Inventory-Report'];
 
-            if (!empty($officeCode)) {
+            if (! empty($officeCode)) {
                 $filenameParts[] = $officeCode;
             }
 
-            if (!empty($filters['division']) && $filters['division'] !== 'All') {
+            if (! empty($filters['division']) && $filters['division'] !== 'All') {
                 $filenameParts[] = $filters['division'];
             }
 
-            if (!empty($filters['employee']) && $filters['employee'] !== 'All') {
+            if (! empty($filters['employee']) && $filters['employee'] !== 'All') {
                 $filenameParts[] = $filters['employee'];
             }
 
-            if (!empty($filters['item_type']) && $filters['item_type'] !== 'All') {
+            if (! empty($filters['item_type']) && $filters['item_type'] !== 'All') {
                 $filenameParts[] = $filters['item_type'];
             }
 
-            if (!empty($filters['status']) && $filters['status'] !== 'All') {
+            if (! empty($filters['status']) && $filters['status'] !== 'All') {
                 $filenameParts[] = $filters['status'];
             }
 
@@ -191,7 +193,7 @@ class InventoryReportController extends Controller
             $filename = implode('_', array_map(
                 fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
                 $filenameParts
-            )) . '.pdf';
+            )).'.pdf';
 
             while (ob_get_level() > 0) {
                 ob_end_clean();
@@ -201,7 +203,7 @@ class InventoryReportController extends Controller
 
             return response($pdfOutput, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
                 'Content-Length' => strlen($pdfOutput),
             ]);
         } catch (\Throwable $e) {
@@ -219,7 +221,8 @@ class InventoryReportController extends Controller
         }
     }
 
-    private function getReportRows(Request $request, HrisClientService $hris) {
+    private function getReportRows(Request $request, HrisClientService $hris)
+    {
         $employeeMap = collect($hris->getEmployeesCached())
             ->filter(fn ($e) => isset($e['id']))
             ->keyBy(fn ($e) => (int) $e['id']);
@@ -254,9 +257,9 @@ class InventoryReportController extends Controller
 
             $query->where(function ($q) use ($officeId) {
                 $q->where('inventories.office_id', $officeId)
-                  ->orWhereHas('parent_component', function ($q2) use ($officeId) {
-                      $q2->where('office_id', $officeId);
-                  });
+                    ->orWhereHas('parent_component', function ($q2) use ($officeId) {
+                        $q2->where('office_id', $officeId);
+                    });
             });
         }
 
@@ -265,121 +268,121 @@ class InventoryReportController extends Controller
 
             $query->where(function ($q) use ($divisionId) {
                 $q->where('inventories.division_id', $divisionId)
-                  ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
-                      $q2->where('division_id', $divisionId);
-                  });
+                    ->orWhereHas('parent_component', function ($q2) use ($divisionId) {
+                        $q2->where('division_id', $divisionId);
+                    });
             });
         }
 
         return $query
-          ->leftJoin('inventories as parent_inv', 'inventories.parent_component_id', '=', 'parent_inv.id')
-          ->select('inventories.*')
-          ->orderByRaw('COALESCE(inventories.division_name, parent_inv.division_name) IS NULL')
-          ->orderByRaw('COALESCE(inventories.division_name, parent_inv.division_name) ASC')
-          ->orderBy('inventories.property_number')
-          ->get()
-          ->map(function ($inventory) use ($employeeMap) {
-              $effectiveEmployeeId = $inventory->employee_id ?: $inventory->parent_component?->employee_id;
-              $employee = $employeeMap->get((int) $effectiveEmployeeId);
+            ->leftJoin('inventories as parent_inv', 'inventories.parent_component_id', '=', 'parent_inv.id')
+            ->select('inventories.*')
+            ->orderByRaw('COALESCE(inventories.division_name, parent_inv.division_name) IS NULL')
+            ->orderByRaw('COALESCE(inventories.division_name, parent_inv.division_name) ASC')
+            ->orderBy('inventories.property_number')
+            ->get()
+            ->map(function ($inventory) use ($employeeMap) {
+                $effectiveEmployeeId = $inventory->employee_id ?: $inventory->parent_component?->employee_id;
+                $employee = $employeeMap->get((int) $effectiveEmployeeId);
 
-              $employeeName =
-                  data_get($employee, 'fullname') ?:
-                  data_get($employee, 'full_name');
+                $employeeName =
+                    data_get($employee, 'fullname') ?:
+                    data_get($employee, 'full_name');
 
-              $employeeOffice =
-                  data_get($employee, 'office_desc') ?:
-                  data_get($employee, 'office_code');
+                $employeeOffice =
+                    data_get($employee, 'office_desc') ?:
+                    data_get($employee, 'office_code');
 
-              $divisionSection =
-                  data_get($employee, 'division_section')
-                  ?: data_get($employee, 'division')
-                  ?: data_get($employee, 'section')
-                  ?: data_get($employee, 'division_desc')
-                  ?: data_get($employee, 'section_desc');
+                $divisionSection =
+                    data_get($employee, 'division_section')
+                    ?: data_get($employee, 'division')
+                    ?: data_get($employee, 'section')
+                    ?: data_get($employee, 'division_desc')
+                    ?: data_get($employee, 'section_desc');
 
-            $inventoryDivision = $inventory->division_name ?: $inventory->parent_component?->division_name;
+                $inventoryDivision = $inventory->division_name ?: $inventory->parent_component?->division_name;
 
-              $employeeDisplay = $employeeName ?: '';
-              if ($employeeOffice) {
-                  $employeeDisplay .= ($employeeDisplay ? "\n" : '') . '(' . $employeeOffice . ')';
-              }
+                $employeeDisplay = $employeeName ?: '';
+                if ($employeeOffice) {
+                    $employeeDisplay .= ($employeeDisplay ? "\n" : '').'('.$employeeOffice.')';
+                }
 
-              $inventoryOffice = $inventory->office_name ?: $inventory->parent_component?->office_name;
+                $inventoryOffice = $inventory->office_name ?: $inventory->parent_component?->office_name;
 
+                $brandModelDisplay = $this->formatBrandModel($inventory->brand_model);
 
-              $brandModelDisplay = $this->formatBrandModel($inventory->brand_model);
+                $propertyNumberDisplay = $inventory->property_number ?: '';
 
-              $propertyNumberDisplay = $inventory->property_number ?: '';
+                if ($inventory->parent_component?->property_number) {
+                    $propertyNumberDisplay .= ($propertyNumberDisplay ? "\n" : '').'(Parent: '.$inventory->parent_component->property_number.')';
+                }
 
-              if ($inventory->parent_component?->property_number) {
-                  $propertyNumberDisplay .= ($propertyNumberDisplay ? "\n" : '') . '(Parent: ' . $inventory->parent_component->property_number . ')';
-              }
+                $childComponentsDisplay = $inventory->internal_components
+                    ->map(function ($component) {
+                        $componentBrandModel = $this->formatBrandModel($component->brand_model);
 
-              $childComponentsDisplay = $inventory->internal_components
-                  ->map(function ($component) {
-                      $componentBrandModel = $this->formatBrandModel($component->brand_model);
+                        $parts = [];
 
-                      $parts = [];
+                        if ($componentBrandModel) {
+                            $parts[] = $componentBrandModel;
+                        }
 
-                      if ($componentBrandModel) {
-                          $parts[] = $componentBrandModel;
-                      }
+                        if ($component->slot) {
+                            $parts[] = 'Slot: '.$component->slot;
+                        }
 
-                      if ($component->slot) {
-                          $parts[] = 'Slot: ' . $component->slot;
-                      }
+                        if ($component->quantity) {
+                            $parts[] = 'Qty: '.$component->quantity;
+                        }
 
-                      if ($component->quantity) {
-                          $parts[] = 'Qty: ' . $component->quantity;
-                      }
+                        if ($component->specific_serial_number) {
+                            $parts[] = 'SN: '.$component->specific_serial_number;
+                        }
 
-                      if ($component->specific_serial_number) {
-                          $parts[] = 'SN: ' . $component->specific_serial_number;
-                      }
+                        if ($component->notes) {
+                            $parts[] = 'Notes: '.$component->notes;
+                        }
 
-                      if ($component->notes) {
-                          $parts[] = 'Notes: ' . $component->notes;
-                      }
+                        return implode(' | ', $parts);
+                    })
+                    ->filter()
+                    ->values()
+                    ->implode("\n");
 
-                      return implode(' | ', $parts);
-                  })
-                  ->filter()
-                  ->values()
-                  ->implode("\n");
+                $rawDateAcquired = $inventory->date_acquired;
 
-              $rawDateAcquired = $inventory->date_acquired;
-                  
-              if (! $rawDateAcquired && $inventory->parent_component_id) {
-                  $rawDateAcquired = $inventory->parent_component?->date_acquired;
-              }
-              
-              $isObsolete = $rawDateAcquired
-                  ? Carbon::parse($rawDateAcquired)->lt(now()->subYears(5))
-                  : false;
+                if (! $rawDateAcquired && $inventory->parent_component_id) {
+                    $rawDateAcquired = $inventory->parent_component?->date_acquired;
+                }
 
-              return [
-                  'property_number'  => $this->cleanPdfText($propertyNumberDisplay),
-                  'employee_name'    => $this->cleanPdfText($employeeDisplay),
-                  'office'           => $this->cleanPdfText($inventoryOffice),
-                  'division'         => $this->cleanPdfText($inventoryDivision),
-                  'division_section' => $this->cleanPdfText($divisionSection),
-                  'item_type'        => $this->cleanPdfText($inventory->item_type?->type),
-                  'brand_model'      => $this->cleanPdfText($brandModelDisplay),
-                  'child_components' => $this->cleanPdfText($childComponentsDisplay),
-                  'serial_number'    => $this->cleanPdfText($inventory->serial_number),
-                  'status'           => $this->cleanPdfText($inventory->status),
-                  'date_acquired' => $this->cleanPdfText(
-                      $rawDateAcquired
-                          ? Carbon::parse($rawDateAcquired)->format('F d, Y')
-                          : ''
-                  ),
-                  'is_primary'  => in_array(strtolower($inventory->item_type?->type ?? ''), ['system unit', 'laptop']),
-                  'is_obsolete'      => $isObsolete,
-              ];
-          });
+                $isObsolete = $rawDateAcquired
+                    ? Carbon::parse($rawDateAcquired)->lt(now()->subYears(5))
+                    : false;
+
+                return [
+                    'property_number' => $this->cleanPdfText($propertyNumberDisplay),
+                    'employee_name' => $this->cleanPdfText($employeeDisplay),
+                    'office' => $this->cleanPdfText($inventoryOffice),
+                    'division' => $this->cleanPdfText($inventoryDivision),
+                    'division_section' => $this->cleanPdfText($divisionSection),
+                    'item_type' => $this->cleanPdfText($inventory->item_type?->type),
+                    'brand_model' => $this->cleanPdfText($brandModelDisplay),
+                    'child_components' => $this->cleanPdfText($childComponentsDisplay),
+                    'serial_number' => $this->cleanPdfText($inventory->serial_number),
+                    'status' => $this->cleanPdfText($inventory->status),
+                    'date_acquired' => $this->cleanPdfText(
+                        $rawDateAcquired
+                            ? Carbon::parse($rawDateAcquired)->format('F d, Y')
+                            : ''
+                    ),
+                    'is_primary' => in_array(strtolower($inventory->item_type?->type ?? ''), ['system unit', 'laptop']),
+                    'is_obsolete' => $isObsolete,
+                ];
+            });
     }
 
-    private function getReportQuery(Request $request) {
+    private function getReportQuery(Request $request)
+    {
         $query = Inventory::query()->with([
             'item_type',
             'brand_model',
@@ -407,7 +410,8 @@ class InventoryReportController extends Controller
         return $query;
     }
 
-    private function cleanPdfText($value): string {
+    private function cleanPdfText($value): string
+    {
         if ($value === null) {
             return '';
         }
@@ -419,7 +423,8 @@ class InventoryReportController extends Controller
         return trim($value);
     }
 
-    private function formatBrandModel($brandModel): string {
+    private function formatBrandModel($brandModel): string
+    {
         if (! $brandModel) {
             return '';
         }

@@ -11,118 +11,123 @@ use Illuminate\Support\Facades\Gate;
 
 class ItSupplyController extends Controller
 {
-    public function index(Request $request) {
-      Gate::authorize('it_supplies.view');
+    public function index(Request $request)
+    {
+        Gate::authorize('it_supplies.view');
 
-      $query = ItSupply::query();
+        $query = ItSupply::query();
 
-      if($request->has('search')) {
-        $search = $request->search;
-        $query->where(function ($q) use($search) {
-          $q->where('item_number', 'LIKE', "%{$search}%")
-          ->orWhere('stock_number', 'LIKE', "%{$search}%")
-          ->orWhere('ics_number', 'LIKE', "%{$search}%")
-          ->orWhere('iar_number', 'LIKE', "%{$search}%")
-          ->orWhere('po_number', 'LIKE', "%{$search}%")
-          ->orWhereHas('brand_model', function ($q2) use($search) {
-            $q2->where('name', 'LIKE', "%{$search}%")
-            ->orWhereHas('brand', function ($q3) use($search) {
-              $q3->where('name', 'LIKE', "%{$search}%");
-            })
-            ->orWhereHas('item_type', function ($q4) use($search) {
-              $q4->where('type', 'LIKE', "%{$search}%");
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('item_number', 'LIKE', "%{$search}%")
+                    ->orWhere('stock_number', 'LIKE', "%{$search}%")
+                    ->orWhere('ics_number', 'LIKE', "%{$search}%")
+                    ->orWhere('iar_number', 'LIKE', "%{$search}%")
+                    ->orWhere('po_number', 'LIKE', "%{$search}%")
+                    ->orWhereHas('brand_model', function ($q2) use ($search) {
+                        $q2->where('name', 'LIKE', "%{$search}%")
+                            ->orWhereHas('brand', function ($q3) use ($search) {
+                                $q3->where('name', 'LIKE', "%{$search}%");
+                            })
+                            ->orWhereHas('item_type', function ($q4) use ($search) {
+                                $q4->where('type', 'LIKE', "%{$search}%");
+                            });
+                    });
             });
-          });
-        });
-      }
+        }
 
-      // Sorting (default to ID)
-      if ($request->has('sort')) {
-        $order = $request->input('order', 'asc');
-        $query->orderBy($request->sort, $order);
-      }
+        // Sorting (default to ID)
+        if ($request->has('sort')) {
+            $order = $request->input('order', 'asc');
+            $query->orderBy($request->sort, $order);
+        }
 
-      // Paginate with customizable per-page count
-      $items = $query->paginate($request->input('per_page', 5))->appends($request->query());
+        // Paginate with customizable per-page count
+        $items = $query->paginate($request->input('per_page', 5))->appends($request->query());
 
-      return response()->json([
-          'data' => ItSupplyResource::collection($items),
-          'meta' => [
-              'total' => $items->total(),
-              'per_page' => $items->perPage(),
-              'current_page' => $items->currentPage(),
-              'last_page' => $items->lastPage(),
-          ]
-      ]);
+        return response()->json([
+            'data' => ItSupplyResource::collection($items),
+            'meta' => [
+                'total' => $items->total(),
+                'per_page' => $items->perPage(),
+                'current_page' => $items->currentPage(),
+                'last_page' => $items->lastPage(),
+            ],
+        ]);
     }
 
-    public function store(StoreItSupplyRequest $request) {
-      Gate::authorize('it_supplies.create');
-      
-      $data = $request->validated();
+    public function store(StoreItSupplyRequest $request)
+    {
+        Gate::authorize('it_supplies.create');
 
-      $itSupply = ItSupply::create($data);
+        $data = $request->validated();
 
-      return new ItSupplyResource($itSupply);
+        $itSupply = ItSupply::create($data);
+
+        return new ItSupplyResource($itSupply);
     }
 
-    public function update(UpdateItSupplyRequest $request, ItSupply $itSupply) {
-      Gate::authorize('it_supplies.update');
+    public function update(UpdateItSupplyRequest $request, ItSupply $itSupply)
+    {
+        Gate::authorize('it_supplies.update');
 
-      $data = $request->validated();
+        $data = $request->validated();
 
-      $itSupply->update($data);
+        $itSupply->update($data);
 
-      return new ItSupplyResource($itSupply);
+        return new ItSupplyResource($itSupply);
     }
 
-    public function destroy(ItSupply $itSupply) {
-      Gate::authorize('it_supplies.delete');
+    public function destroy(ItSupply $itSupply)
+    {
+        Gate::authorize('it_supplies.delete');
 
-      $itSupply->delete();
-      
-      return new ItSupplyResource($itSupply);
+        $itSupply->delete();
+
+        return new ItSupplyResource($itSupply);
     }
 
-    public function select() {
-      Gate::authorize('it_supplies.select');
-      
-      $itSupplies = ItSupply::all();
+    public function select()
+    {
+        Gate::authorize('it_supplies.select');
 
-      return response()->json([
-        'data' => ItSupplyResource::collection($itSupplies)
-      ]);
+        $itSupplies = ItSupply::all();
+
+        return response()->json([
+            'data' => ItSupplyResource::collection($itSupplies),
+        ]);
     }
 
-    public function search(Request $request) {
-      Gate::authorize('it_supplies.search');
-      
-      $query = $request->input('q');
-      $limit = (int) $request->input('limit', 20);
-      $page = (int) $request->input('page', 1);
-      $offset = ($page - 1) * $limit;
+    public function search(Request $request)
+    {
+        Gate::authorize('it_supplies.search');
 
-      $it_supplies = ItSupply::query()
-          ->when($query, fn($qBuilder) =>
-              $qBuilder->where('item_number', 'like', "%$query%")
-              ->orWhere('stock_number', 'like', "%$query%")
-              ->orWhere('description', 'like', "%$query%")
-              ->orWhereHas('brand_model', function ($q2) use($query) {
-                $q2->where('name', 'like', "%$query%")
-                ->orWhereHas('brand', function ($q3) use($query) {
-                  $q3->where('name', 'like', "%$query%");
+        $query = $request->input('q');
+        $limit = (int) $request->input('limit', 20);
+        $page = (int) $request->input('page', 1);
+        $offset = ($page - 1) * $limit;
+
+        $it_supplies = ItSupply::query()
+            ->when($query, fn ($qBuilder) => $qBuilder->where('item_number', 'like', "%$query%")
+                ->orWhere('stock_number', 'like', "%$query%")
+                ->orWhere('description', 'like', "%$query%")
+                ->orWhereHas('brand_model', function ($q2) use ($query) {
+                    $q2->where('name', 'like', "%$query%")
+                        ->orWhereHas('brand', function ($q3) use ($query) {
+                            $q3->where('name', 'like', "%$query%");
+                        })
+                        ->orWhereHas('item_type', function ($q4) use ($query) {
+                            $q4->where('type', 'like', "%$query%");
+                        });
                 })
-                ->orWhereHas('item_type', function ($q4) use($query) {
-                  $q4->where('type', 'like', "%$query%");
-                });
-              })
-          )
-          ->offset($offset)
-          ->limit($limit)
-          ->get();
+            )
+            ->offset($offset)
+            ->limit($limit)
+            ->get();
 
-      return response()->json([
-          'data' => ItSupplyResource::collection($it_supplies),
-      ]);
+        return response()->json([
+            'data' => ItSupplyResource::collection($it_supplies),
+        ]);
     }
 }

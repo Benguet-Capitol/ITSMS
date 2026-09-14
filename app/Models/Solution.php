@@ -6,8 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Solution extends Model
 {
-
-    protected $with = [ 'author'];
+    protected $with = ['author'];
 
     protected $fillable = [
         'author_id',
@@ -22,7 +21,8 @@ class Solution extends Model
     //     return $this->hasMany(Ticket::class);
     // }
 
-    public function author() {
+    public function author()
+    {
         return $this->belongsTo(Profile::class, 'author_id');
     }
 }

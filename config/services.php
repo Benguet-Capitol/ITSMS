@@ -38,25 +38,11 @@ return [
     // API Services
     'hris' => [
         'base_url' => env('HRIS_BASE_URL'),
-        'api_key'  => env('HRIS_API_KEY'),
-        'timeout'  => (int) env('HRIS_TIMEOUT', 10),
+        'api_key' => env('HRIS_API_KEY'),
+        'timeout' => (int) env('HRIS_TIMEOUT', 10),
     ],
 
-    'employee_filters' => [
-        'employee_id' => [
-            'type' => 'string',
-            'min' => 6,
-        ],
-        'office_id' => [
-            'type' => 'int',
-        ],
-        'type' => [
-            'type' => 'string',
-            'allowed' => ['permanent', 'casual', 'contract', 'job_order'],
-        ],
-
-        // future:
-        // 'fullname' => ['type' => 'string', 'min' => 2],
-    ],
+    // Moved to config/hris.php — EmployeeController::search() reads
+    // config('hris.employee_filters'), not config('services.employee_filters').
 
 ];

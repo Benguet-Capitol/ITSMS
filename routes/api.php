@@ -9,10 +9,11 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryReportController;
+use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\ItServiceController;
 use App\Http\Controllers\ItSupplyController;
-use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\MeasurementUnitController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OtherItServiceRequestController;
 use App\Http\Controllers\PermissionController;
@@ -20,15 +21,14 @@ use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SolutionController;
+use App\Http\Controllers\TicketComplexityLevelController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\NotificationController;
 use App\Http\Middleware\AuthGates;
 use App\Http\Resources\UserResource;
 use App\Services\HrisClientService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -105,7 +105,15 @@ Route::middleware([
     Route::apiResource('users', UserController::class);
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('permissions', PermissionController::class);
+    Route::get('permissions/{permission}/usage', [
+        PermissionController::class,
+        'usage',
+    ]);
     Route::apiResource('roles', RoleController::class);
+    Route::get('roles/{role}/usage', [
+        RoleController::class,
+        'usage',
+    ]);
     Route::apiResource('positions', PositionController::class);
 
     Route::apiResource('employees', EmployeeController::class)
@@ -113,14 +121,27 @@ Route::middleware([
 
     Route::apiResource('brands', BrandController::class);
     Route::apiResource('brand-models', BrandModelController::class);
+    Route::get('brand-models/{brand_model}/usage', [
+        BrandModelController::class,
+        'usage',
+    ]);
     Route::apiResource('item-types', ItemTypeController::class);
+    Route::get('item-types/{item_type}/usage', [
+        ItemTypeController::class,
+        'usage',
+    ]);
     Route::apiResource('common-problems', CommonProblemController::class);
     Route::apiResource('inventories', InventoryController::class);
     Route::apiResource('it-services', ItServiceController::class);
     Route::apiResource('tickets', TicketController::class);
     Route::apiResource('solutions', SolutionController::class);
     Route::apiResource('agencies', AgencyController::class);
+    Route::get('agencies/{agency}/usage', [
+        AgencyController::class,
+        'usage',
+    ]);
     Route::apiResource('measurement-units', MeasurementUnitController::class);
+    Route::apiResource('ticket-complexity-levels', TicketComplexityLevelController::class);
     Route::apiResource('it-supplies', ItSupplyController::class);
     Route::apiResource(
         'other-it-service-requests',
@@ -187,11 +208,21 @@ Route::middleware([
             MeasurementUnitController::class,
             'select',
         ])->middleware('can:measurement_units.select');
-        
+
+        Route::get('ticket-complexity-levels', [
+            TicketComplexityLevelController::class,
+            'select',
+        ])->middleware('can:ticket_complexity_levels.select');
+
         Route::get('offices', [
             OfficeController::class,
             'index',
         ])->middleware('can:offices.view');
+
+        Route::get('common-problems', [
+            CommonProblemController::class,
+            'select',
+        ])->middleware('can:common_problems.select');
     });
 
     /*
@@ -236,8 +267,6 @@ Route::middleware([
             'search',
         ])->middleware('can:offices.search');
     });
-
-    
 
     /*
     |--------------------------------------------------------------------------
@@ -382,6 +411,11 @@ Route::middleware([
     Route::put('me/stop-heartbeat', [
         ProfileController::class,
         'setStatusOffline',
+    ]);
+
+    Route::put('me/idle', [
+        ProfileController::class,
+        'markIdle',
     ]);
 
     /*

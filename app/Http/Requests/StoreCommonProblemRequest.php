@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Auth;
 
 class StoreCommonProblemRequest extends FormRequest
 {
@@ -18,7 +19,7 @@ class StoreCommonProblemRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -30,11 +31,12 @@ class StoreCommonProblemRequest extends FormRequest
         ];
     }
 
-    public function messages(): array {
+    public function messages(): array
+    {
         return [
-            'code.unique'   => 'This error :attribute already exists.',
-            'general_term.unique'   => 'This :attribute already exists.',
-            'item_type_id.required'   => 'This :attribute is required.',
+            'code.unique' => 'This error :attribute already exists.',
+            'general_term.unique' => 'This :attribute already exists.',
+            'item_type_id.required' => 'This :attribute is required.',
         ];
     }
 }

@@ -19,21 +19,21 @@ class RoleResource extends JsonResource
 
         $permissions = [];
 
-        if($role) {
-          foreach($role->permissions as $permission) {
-            $permissions[] = [
-              'id' => $permission->id,
-              'title' => $permission->title,
-            ];
-          }
+        if ($role) {
+            foreach ($role->permissions as $permission) {
+                $permissions[] = [
+                    'id' => $permission->id,
+                    'title' => $permission->title,
+                ];
+            }
         }
 
         return [
-          'id' => $this->id,
-          'title' => $this->title,
-          'created_at' => $this->created_at,
-          'updated_at' => $this->updated_at,
-          'permissions' => $permissions,
+            'id' => $this->id,
+            'title' => $this->title,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+            'permissions' => $permissions,
         ];
     }
 }

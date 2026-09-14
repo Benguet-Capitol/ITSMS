@@ -25,7 +25,7 @@ class OfficeResource extends JsonResource
             // Handy aliases for UI
             'code' => $this['office_code'] ?? null,
             'name' => $this['office_desc'] ?? null,
-            'label' => ($this['office_code'] ?? '') . ' - ' . ($this['office_desc'] ?? ''),
+            'label' => ($this['office_code'] ?? '').' - '.($this['office_desc'] ?? ''),
         ];
     }
 }

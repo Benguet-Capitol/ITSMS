@@ -4,8 +4,6 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use App\Http\Resources\BrandResource;
-use App\Http\Resources\ItemTypeResource;
 
 class BrandModelResource extends JsonResource
 {
@@ -17,7 +15,7 @@ class BrandModelResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-          'id' => $this->id,
+            'id' => $this->id,
             'name' => $this->name,
             'specification' => $this->specification,
             'specifications_json' => $this->specifications_json,
