@@ -146,7 +146,7 @@ return [
     'features' => [
         Features::registration(),
         Features::resetPasswords(),
-        // Features::emailVerification(),
+        Features::emailVerification(),
         Features::updateProfileInformation(),
         Features::updatePasswords(),
         Features::twoFactorAuthentication([
@@ -154,6 +154,23 @@ return [
             'confirmPassword' => true,
             // 'window' => 0,
         ]),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Redirects
+    |--------------------------------------------------------------------------
+    |
+    | The Nuxt frontend is a separate app from this API (see FRONTEND_URL in
+    | .env), so the signed email-verification link -- opened directly from
+    | the user's inbox, not via the SPA -- needs to land back on the
+    | frontend rather than Fortify's default `home` path, which doesn't
+    | exist here.
+    |
+    */
+
+    'redirects' => [
+        'email-verification' => env('FRONTEND_URL', env('APP_URL', 'http://localhost')),
     ],
 
 ];
