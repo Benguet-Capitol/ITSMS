@@ -18,6 +18,7 @@ use App\Services\PdfImageService;
 use App\Services\ProfileEngagementService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -103,6 +104,7 @@ class TicketController extends Controller
         }
 
         $query = (clone $baseQuery)
+            ->select('tickets.*')
             ->with([
                 'profile',
                 'inventory',
@@ -173,8 +175,7 @@ class TicketController extends Controller
                     // deleted) from the entire list whenever this column
                     // was sorted, not just reordered them.
                     $query->leftJoin('inventories', 'tickets.inventory_id', '=', 'inventories.id')
-                        ->orderBy('inventories.property_number', $order)
-                        ->select('tickets.*');
+                        ->orderBy('inventories.property_number', $order);
                 } else {
                     $query->orderBy($sortable[$sortKey], $order);
                 }
@@ -229,9 +230,20 @@ class TicketController extends Controller
 
         $data = $request->validated();
 
-        $data['ticket_number'] = Ticket::generateTicketNumber();
+        $attempts = 0;
 
-        $ticket = Ticket::create($data);
+        while (true) {
+            $data['ticket_number'] = Ticket::generateTicketNumber();
+
+            try {
+                $ticket = Ticket::create($data);
+                break;
+            } catch (UniqueConstraintViolationException $e) {
+                if (++$attempts >= 5) {
+                    throw $e;
+                }
+            }
+        }
 
         return new TicketResource($ticket);
     }

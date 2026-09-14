@@ -1,0 +1,1 @@
+import{n as e,t}from"#entry";function n(){let e=t(),n=null;return{open:(t,r={})=>{n=e.create(t),n.open(r)},close:e=>{n?.close(e)}}}var r={green:`success`,red:`error`,yellow:`warning`,blue:`info`,gray:`neutral`},i=()=>{let t=e();return{toast:t,actionToastResult:e=>{let n=e?.color;return t.add({...e,...n&&r[n]?{color:r[n]}:{}})}}};export{n,i as t};

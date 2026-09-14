@@ -66,6 +66,7 @@ class UserResource extends JsonResource
             'id' => $this->id,
             'username' => $this->username,
             'email' => $this->email,
+            'email_verified_at' => $this->email_verified_at,
             'status' => $this->status,
             'profile' => new ProfileResource(
                 $this->whenLoaded('profile')

@@ -7,8 +7,10 @@ use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -35,12 +37,6 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
-        // Only replaces the credential-check step -- the 2FA challenge
-        // (Tab 02 critique 5) still runs afterward via Fortify's own
-        // pipeline, unaffected. Returning null here (rather than throwing
-        // a specific "account disabled" message) intentionally gives the
-        // same generic "these credentials do not match" response as a
-        // wrong password, so login doesn't leak which accounts exist.
         Fortify::authenticateUsing(function (Request $request) {
             $user = User::where(Fortify::username(), $request->{Fortify::username()})->first();
 
@@ -63,6 +59,17 @@ class FortifyServiceProvider extends ServiceProvider
 
         RateLimiter::for('two-factor', function (Request $request) {
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        });
+
+        VerifyEmail::toMailUsing(function (User $notifiable, string $url) {
+            $name = $notifiable->profile?->display_name ?: $notifiable->username;
+
+            return (new MailMessage)
+                ->subject('Verify Your Email Address')
+                ->greeting("Hi {$name},")
+                ->line('Please click the button below to verify your email address.')
+                ->action('Verify Email Address', $url)
+                ->line('If you did not request this change, no further action is required.');
         });
     }
 }
