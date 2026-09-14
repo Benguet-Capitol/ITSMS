@@ -1,0 +1,1 @@
+import{w as e}from"#entry";var t=()=>{let t=e(),n=e=>t.value?.permissions?.[e]===!0;return{can:n,canAny:(...e)=>e.some(e=>n(e)),canAll:(...e)=>e.every(e=>n(e))}};export{t};

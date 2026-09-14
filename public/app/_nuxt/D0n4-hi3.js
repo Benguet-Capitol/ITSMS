@@ -1,0 +1,1 @@
+import{w as e}from"#entry";import{t}from"./B8rJPHag.js";var n=()=>{let{login:n,logout:r}=t();return{authLoginApi:async e=>await n(e),fetchLoggedInUserApi:async()=>await e(),authLogoutApi:async()=>await r()}};export{n as t};

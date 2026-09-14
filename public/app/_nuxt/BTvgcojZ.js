@@ -1,0 +1,1 @@
+import{g as e}from"./Car86Ubo.js";import{Ct as t}from"./B3evd625.js";function n(n,r,i){let{capitalizeAll:a}=t(),o=i??(e=>a(e));return e({get:()=>n.value[r],set:e=>{n.value[r]=o(e)}})}export{n as t};

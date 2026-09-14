@@ -1,0 +1,1 @@
+import{c as e}from"./OVSoaH_9.js";var t=()=>e(`color-mode`).value;export{t};

@@ -1,0 +1,1 @@
+import{C as e,x as t}from"./DkPcOd13.js";import{w as n}from"#entry";var r=t(t=>{let r=t.meta.permission;if(!r)return;let i=n();if(!i.value)return e(`/login`,{replace:!0});if(i.value.permissions?.[r]!==!0)return e(`/unauthorized`,{replace:!0})});export{r as default};
