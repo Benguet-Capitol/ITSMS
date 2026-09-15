@@ -1,0 +1,1 @@
+import{a as e}from"./Bgh-eSNQ.js";var t=()=>e(`color-mode`).value;export{t};

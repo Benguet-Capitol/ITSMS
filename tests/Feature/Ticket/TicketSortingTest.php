@@ -81,6 +81,33 @@ test('sorting tickets by property number still includes tickets without an inven
     expect($ticketNumbers)->toContain('SORT-0001', 'SORT-0002');
 });
 
+test('sorting by property number does not lose accepted_by_me/personnel_count', function () {
+    $itService = ItService::factory()->create();
+    $inventory = Inventory::factory()->create();
+
+    $ticket = Ticket::create([
+        'profile_id' => Profile::factory()->create()->id,
+        'it_service_id' => $itService->id,
+        'inventory_id' => $inventory->id,
+        'ticket_number' => 'SORT-0007',
+        'concern' => 'Accepted by the acting user',
+        'query_status' => 'in_progress',
+        'request_status' => 'accepted',
+    ]);
+
+    $ticket->personnel()->attach($this->actor->profile->id);
+
+    $response = $this->getJson('/api/tickets?sort=property_number&order=asc');
+
+    $response->assertSuccessful();
+
+    $entry = collect($response->json('data'))->firstWhere('ticket_number', 'SORT-0007');
+
+    expect($entry)->not->toBeNull();
+    expect($entry['is_accepted_by_me'])->toBeTrue();
+    expect($entry['personnel_count'])->toBe(1);
+});
+
 /**
  * Covers enabling sorting for Query Status / Request Status: the frontend
  * columns were keyed to the *_formatted display fields (e.g.

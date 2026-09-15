@@ -164,16 +164,87 @@ test('two-factor authentication can be enabled, confirmed, and challenged on nex
     $this->assertAuthenticatedAs($user);
 });
 
-test('email verification stays disabled per the requirements decision pending product owner sign-off', function () {
-    // UserFactory defaults email_verified_at to now(); force the
-    // unverified case this test actually cares about.
+test('an unverified user is not blocked from authenticated routes', function () {
+    // Features::emailVerification() only registers the verification
+    // routes/notification -- nothing in routes/api.php applies the
+    // `verified` middleware, so an unverified user is still fully
+    // functional in the app while re-verification is pending.
     $user = User::factory()->create(['email_verified_at' => null]);
-
-    // Features::emailVerification() is commented out in config/fortify.php,
-    // so unverified users are never blocked from authenticated routes.
-    expect($user->email_verified_at)->toBeNull();
 
     $this->actingAs($user)
         ->getJson('/api/user')
         ->assertSuccessful();
+});
+
+test('changing email requires re-verification and sends a new verification notice', function () {
+    Notification::fake();
+
+    $user = User::factory()->create([
+        'email' => 'old@example.com',
+    ]);
+    expect($user->email_verified_at)->not->toBeNull();
+
+    $this->actingAs($user)
+        ->putJson('/api/user/profile-information', [
+            'email' => 'new@example.com',
+        ])->assertSuccessful();
+
+    $user->refresh();
+    expect($user->email)->toBe('new@example.com');
+    expect($user->email_verified_at)->toBeNull();
+
+    Notification::assertSentTo($user, \Illuminate\Auth\Notifications\VerifyEmail::class);
+});
+
+test('re-submitting the same email does not reset verification or resend the notice', function () {
+    Notification::fake();
+
+    $user = User::factory()->create(['email' => 'same@example.com']);
+    $verifiedAt = $user->email_verified_at;
+
+    $this->actingAs($user)
+        ->putJson('/api/user/profile-information', [
+            'email' => 'same@example.com',
+        ])->assertSuccessful();
+
+    $user->refresh();
+    expect($user->email_verified_at->equalTo($verifiedAt))->toBeTrue();
+
+    Notification::assertNothingSent();
+});
+
+test('email must be unique across other users', function () {
+    User::factory()->create(['email' => 'taken@example.com']);
+    $user = User::factory()->create(['email' => 'mine@example.com']);
+
+    $this->actingAs($user)
+        ->putJson('/api/user/profile-information', [
+            'email' => 'taken@example.com',
+        ])->assertStatus(422);
+
+    $user->refresh();
+    expect($user->email)->toBe('mine@example.com');
+});
+
+test('a verification link marks the email as verified and resend can be requested', function () {
+    Notification::fake();
+
+    $user = User::factory()->create(['email_verified_at' => null]);
+
+    $this->actingAs($user)
+        ->postJson('/api/email/verification-notification')
+        ->assertSuccessful();
+
+    Notification::assertSentTo($user, \Illuminate\Auth\Notifications\VerifyEmail::class);
+
+    $verifyUrl = \Illuminate\Support\Facades\URL::temporarySignedRoute(
+        'verification.verify',
+        now()->addMinutes(60),
+        ['id' => $user->id, 'hash' => sha1($user->email)]
+    );
+
+    $this->actingAs($user)->get($verifyUrl)->assertRedirect();
+
+    $user->refresh();
+    expect($user->hasVerifiedEmail())->toBeTrue();
 });

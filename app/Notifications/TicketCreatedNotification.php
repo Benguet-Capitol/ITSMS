@@ -22,11 +22,16 @@ class TicketCreatedNotification extends Notification
     /**
      * Get the notification's delivery channels.
      *
+     * Every IT Technical user gets the in-app (database) notification for
+     * general awareness, but only ones whose office/agency actually matches
+     * the ticket get emailed -- otherwise every ticket emails the entire
+     * technical team regardless of relevance.
+     *
      * @return array<int, string>
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return $this->isPriorityMatch ? ['database', 'mail'] : ['database'];
     }
 
     public function toDatabase(object $notifiable): array
