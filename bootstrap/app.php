@@ -13,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->statefulApi();
+
+        $middleware->redirectGuestsTo(
+            fn () => rtrim(config('fortify.redirects.email-verification'), '/').'/auth/login'
+        );
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

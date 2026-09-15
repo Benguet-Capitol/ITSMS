@@ -733,13 +733,40 @@ class TicketController extends Controller
             'concern' => $ticket->concern,
             'components' => $ticket->assessment->components ?? [],
             'component_remarks' => $ticket->assessment->component_remarks ?? [],
-            // These labels must match components/tickets/AssessModal.vue's
-            // SYSTEM_UNIT_PARTS/PERIPHERALS/LAPTOP_PARTS/MOBILE_PARTS
-            // exactly (including the "(Category)" suffixes on labels that
-            // repeat across categories) -- $components is a flat array of
-            // the checked labels, matched here with a plain in_array(), so
-            // a mismatched label (e.g. this used to say "OTHERS" while the
-            // modal stores "OTHERS (System Unit)") never shows as checked.
+            ...self::assessmentComponentCategories(),
+            ...$pdfImages->agencyLogos(),
+        ];
+
+        // "Short" bond paper or Letter(8.5x11in),
+        $pdf = Pdf::loadView('reports.ticket-assessment', $data)
+            ->setPaper('letter', 'portrait');
+
+        $filename = 'Assessment-'
+            .$ticket->ticket_number
+            .'-'
+            .now()->format('Y-m-d_Hi')
+            .'.pdf';
+
+        return $pdf->download($filename, [
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+        ]);
+    }
+
+    /**
+     * The fixed component checklist shown on the assessment report and in
+     * the assess modal. This is the backend's single copy -- the frontend
+     * (components/tickets/AssessModal.vue) maintains its own SYSTEM_UNIT_PARTS/
+     * PERIPHERALS/LAPTOP_PARTS/MOBILE_PARTS constants that must match these
+     * exactly, since there's no shared runtime between the two apps.
+     * tests/Feature/Ticket/AssessmentComponentLabelsMatchFrontendTest.php
+     * pins the frontend's current values and fails if this array drifts
+     * from them.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function assessmentComponentCategories(): array
+    {
+        return [
             'system_unit_parts' => [
                 'PROCESSOR',
                 'RAM/ Memory Module',
@@ -791,21 +818,7 @@ class TicketController extends Controller
                 'BUTTONS (Power/Volume)',
                 'OTHERS (Mobile)',
             ],
-            ...$pdfImages->agencyLogos(),
         ];
-
-        $pdf = Pdf::loadView('reports.ticket-assessment', $data)
-            ->setPaper('a4', 'portrait');
-
-        $filename = 'Assessment-'
-            .$ticket->ticket_number
-            .'-'
-            .now()->format('Y-m-d_Hi')
-            .'.pdf';
-
-        return $pdf->download($filename, [
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
-        ]);
     }
 
     /**

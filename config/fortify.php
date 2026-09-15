@@ -128,9 +128,11 @@ return [
     | you may not need them when building your own application. This may be
     | especially true if you're writing a custom single-page application.
     |
+    | Disabled here: this API has no Blade views at all.
+    |
     */
 
-    'views' => true,
+    'views' => false,
 
     /*
     |--------------------------------------------------------------------------
