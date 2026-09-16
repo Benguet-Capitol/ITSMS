@@ -457,11 +457,13 @@ class TicketController extends Controller
             'assessed_by_position' => $user_profile_designation,
         ];
 
-        // control_number is generated once, on first creation -- editing an
-        // existing assessment must never overwrite it.
-        $existingAssessment = $ticket->assessment;
+        $existingAssessment = $ticket->assessment()->withTrashed()->first();
 
         if ($existingAssessment) {
+            if ($existingAssessment->trashed()) {
+                $existingAssessment->restore();
+            }
+
             $existingAssessment->update($payload);
         } else {
             $ticket->assessment()->create([

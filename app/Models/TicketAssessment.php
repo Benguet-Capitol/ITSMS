@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TicketAssessment extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'ticket_id',
         'control_number',
@@ -38,14 +41,14 @@ class TicketAssessment extends Model
 
     public static function generateControlNumber(): string
     {
-        $now = Carbon::now();
+        $prefix = Carbon::now()->format('Y-m');
+        $lastSerial = self::withTrashed()
+            ->where('control_number', 'like', "{$prefix}-%")
+            ->orderByDesc('control_number')
+            ->value('control_number');
 
-        $count = self::whereYear('created_at', $now->year)
-            ->whereMonth('created_at', $now->month)
-            ->count();
+        $lastNumber = $lastSerial ? (int) substr($lastSerial, -4) : 0;
 
-        $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
-
-        return "{$now->format('Y-m')}-{$serial}"; // 2025-10-0001
+        return sprintf('%s-%04d', $prefix, $lastNumber + 1); // 2025-10-0001
     }
 }
