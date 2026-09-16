@@ -32,7 +32,7 @@ class AssessTicketRequest extends FormRequest
             'components' => ['nullable', 'array'],
             'components.*' => ['string'],
             'component_findings' => ['nullable', 'array'],
-            'component_findings.*' => ['nullable', 'string', 'max:255'],
+            'component_findings.*' => ['nullable', 'string'],
             // 'assessed_by'            => ['required', 'string', 'max:255'],
             // 'assessed_by_position'   => ['required', 'string', 'max:255'],
         ];
