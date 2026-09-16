@@ -71,6 +71,7 @@ class UserController extends Controller
         Gate::authorize('users.create');
 
         $data = $request->validated();
+        $data['name'] = json_decode($data['name'], true) ?? [];
         $data['img_path'] = null;
 
         if ($request->hasFile('photo_id')) {
@@ -109,6 +110,9 @@ class UserController extends Controller
         Gate::authorize('users.update');
 
         $data = $request->validated();
+        if (isset($data['name'])) {
+            $data['name'] = json_decode($data['name'], true) ?? [];
+        }
 
         $user_data = [];
         $profile_data = [];
