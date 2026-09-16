@@ -10,14 +10,13 @@ class TicketAssessment extends Model
     protected $fillable = [
         'ticket_id',
         'control_number',
-        'findings',
         'recommendations',
         'replacement_available',
         'specifications',
         'acquisition_cost',
         'is_set',
         'components',
-        'component_remarks',
+        'component_findings',
         'reviewed_by',
         'assessed_by',
         'reviewed_by_position',
@@ -26,7 +25,7 @@ class TicketAssessment extends Model
 
     protected $casts = [
         'components' => 'array',
-        'component_remarks' => 'array',
+        'component_findings' => 'array',
         'replacement_available' => 'boolean',
         'acquisition_cost' => 'decimal:2',
         'is_set' => 'boolean',

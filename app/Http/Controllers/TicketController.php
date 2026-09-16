@@ -732,7 +732,7 @@ class TicketController extends Controller
                 ?? '—',
             'concern' => $ticket->concern,
             'components' => $ticket->assessment->components ?? [],
-            'component_remarks' => $ticket->assessment->component_remarks ?? [],
+            'component_findings' => $ticket->assessment->component_findings ?? [],
             ...self::assessmentComponentCategories(),
             ...$pdfImages->agencyLogos(),
         ];
@@ -776,10 +776,10 @@ class TicketController extends Controller
                 'POWER SUPPLY',
                 'MOTHERBOARD',
                 'OPTICAL DRIVE',
-                'MONITOR',
                 'OTHERS (System Unit)',
             ],
             'peripherals' => [
+                'MONITOR',
                 'KEYBOARD',
                 'MOUSE',
                 'SPEAKER',

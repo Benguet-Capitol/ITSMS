@@ -176,7 +176,8 @@
     <table class="info-table" style="margin-top: 6px;">
         <tr>
             <td style="width:50%">
-                
+                <span class="label-muted">Ticket #:</span>
+                <span class="bold"> {{ $ticket->ticket_number }}</span>
             </td>
             <td style="width:50%">
                 <span class="label-muted" style="color: #ff0000">CONTROL NO.:</span>
@@ -234,7 +235,10 @@
          here -- the full checklist (system unit/peripherals/laptop/mobile,
          ~43 rows) used to print unconditionally regardless of how many
          were checked, which was the main reason this report ran several
-         pages long. --}}
+         pages long. Each checked component's remark now IS the finding for
+         that item -- there's no separate top-level findings field anymore
+         (see AssessTicketRequest/TicketAssessment: `findings` was dropped,
+         `component_remarks` renamed to `component_findings`). --}}
     @php
         $categorizedParts = [
             'System Unit' => $system_unit_parts ?? [],
@@ -249,7 +253,7 @@
                     $checkedComponentRows[] = [
                         'category' => $category,
                         'component' => $part,
-                        'remarks' => ($component_remarks ?? [])[$part] ?? '',
+                        'findings' => ($component_findings ?? [])[$part] ?? '',
                     ];
                 }
             }
@@ -261,21 +265,17 @@
         <tr>
             <td class="col-header" style="width:25%">CATEGORY</td>
             <td class="col-header" style="width:35%">COMPONENT</td>
-            <td class="col-header" style="width:40%">REMARKS</td>
+            <td class="col-header" style="width:40%">FINDINGS</td>
         </tr>
         @foreach($checkedComponentRows as $row)
         <tr>
             <td>{{ $row['category'] }}</td>
             <td>{{ $row['component'] }}</td>
-            <td>{{ $row['remarks'] }}</td>
+            <td>{{ $row['findings'] }}</td>
         </tr>
         @endforeach
     </table>
     @endif
-
-    {{-- FINDINGS --}}
-    <div class="section-label mt-2">FINDINGS:</div>
-    <div class="findings-box">{{ $assessment->findings }}</div>
 
     {{-- RECOMMENDATIONS --}}
     <div class="section-label">RECOMMENDATIONS:</div>

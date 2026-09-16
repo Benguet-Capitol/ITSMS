@@ -22,7 +22,6 @@ class AssessTicketRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'findings' => ['required', 'string'],
             'recommendations' => ['required', 'string'],
             'reviewed_by' => ['required', 'string', 'max:255'],
             'reviewed_by_position' => ['required', 'string', 'max:255'],
@@ -32,8 +31,8 @@ class AssessTicketRequest extends FormRequest
             'is_set' => ['boolean'],
             'components' => ['nullable', 'array'],
             'components.*' => ['string'],
-            'component_remarks' => ['nullable', 'array'],
-            'component_remarks.*' => ['nullable', 'string', 'max:255'],
+            'component_findings' => ['nullable', 'array'],
+            'component_findings.*' => ['nullable', 'string', 'max:255'],
             // 'assessed_by'            => ['required', 'string', 'max:255'],
             // 'assessed_by_position'   => ['required', 'string', 'max:255'],
         ];
@@ -42,7 +41,6 @@ class AssessTicketRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'findings.required' => 'The :attribute is required.',
             'recommendations.required' => 'The :attribute is required.',
             'reviewed_by.required' => 'The :attribute is required.',
             'acquisition_cost.numeric' => 'The :attribute must be a valid number.',
