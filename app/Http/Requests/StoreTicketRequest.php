@@ -39,6 +39,8 @@ class StoreTicketRequest extends FormRequest
             'office_id' => 'nullable|string|max:255',
             'office_code' => 'nullable|string|max:255',
             'office_desc' => 'nullable|string|max:255',
+
+            'related_ticket_id' => 'nullable|exists:tickets,id',
         ];
     }
 

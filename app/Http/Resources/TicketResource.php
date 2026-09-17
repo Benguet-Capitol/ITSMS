@@ -74,6 +74,7 @@ class TicketResource extends JsonResource
             'date' => $this->date,
             'accepted_at' => $this->accepted_at,
             'resolved_at' => $this->resolved_at,
+            'reopened_at' => $this->reopened_at,
             'released_at' => $this->released_at,
             'released_by' => $this->released_by,
             'contact_number' => $this->contact_number,
@@ -114,6 +115,14 @@ class TicketResource extends JsonResource
                 TicketStatus::Cancelled,
             ]),
 
+            'resolutions' => $this->whenLoaded('resolutions', fn () => $this->resolutions->map(fn ($resolution) => [
+                'id' => $resolution->id,
+                'solution' => $resolution->solution ? SolutionResource::make($resolution->solution) : null,
+                'service_method' => $resolution->service_method,
+                'resolved_by' => $resolution->resolved_by,
+                'resolved_at' => $resolution->resolved_at,
+            ])),
+
             'assessment' => $this->whenLoaded('assessment', fn () => [
                 'control_number' => $this->assessment->control_number,
                 'recommendations' => $this->assessment->recommendations,
@@ -129,6 +138,24 @@ class TicketResource extends JsonResource
                 'assessed_by_position' => $this->assessment->assessed_by_position,
                 'created_at' => $this->assessment->created_at,
             ]),
+
+            'related_ticket' => $this->whenLoaded('relatedTicket', fn () => $this->relatedTicket ? [
+                'id' => $this->relatedTicket->id,
+                'ticket_number' => $this->relatedTicket->ticket_number,
+                'concern' => $this->relatedTicket->concern,
+                'query_status' => $this->relatedTicket->query_status,
+                'request_status' => $this->relatedTicket->request_status,
+                'resolved_at' => $this->relatedTicket->resolved_at,
+            ] : null),
+
+            'recurrences' => $this->whenLoaded('recurrences', fn () => $this->recurrences->map(fn ($recurrence) => [
+                'id' => $recurrence->id,
+                'ticket_number' => $recurrence->ticket_number,
+                'concern' => $recurrence->concern,
+                'query_status' => $recurrence->query_status,
+                'request_status' => $recurrence->request_status,
+                'created_at' => $recurrence->created_at,
+            ])),
 
             'office_id' => $this->office_id,
             'office_code' => $this->office_code,

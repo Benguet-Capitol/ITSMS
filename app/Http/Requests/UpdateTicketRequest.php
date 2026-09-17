@@ -31,6 +31,8 @@ class UpdateTicketRequest extends FormRequest
             'is_other_agency' => 'boolean',
             'full_name' => 'nullable|string',
             'client_name' => 'nullable|string|max:255',
+
+            'related_ticket_id' => 'nullable|exists:tickets,id',
         ];
     }
 
@@ -41,6 +43,14 @@ class UpdateTicketRequest extends FormRequest
             $isOtherAgency = filter_var($this->input('is_other_agency'), FILTER_VALIDATE_BOOLEAN);
             $officeId = $this->input('office_id');
             $ticket = $this->route('ticket');
+            $relatedTicketId = $this->input('related_ticket_id');
+
+            if ($relatedTicketId && $ticket && (string) $relatedTicketId === (string) $ticket->id) {
+                $validator->errors()->add(
+                    'related_ticket_id',
+                    'A ticket cannot be marked as a recurrence of itself.'
+                );
+            }
 
             $closedStatuses = [
                 TicketStatus::Resolved,

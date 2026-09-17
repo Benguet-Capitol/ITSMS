@@ -266,6 +266,11 @@ Route::middleware([
             OfficeController::class,
             'search',
         ])->middleware('can:offices.search');
+
+        Route::get('tickets', [
+            TicketController::class,
+            'search',
+        ])->middleware('can:tickets.search');
     });
 
     /*

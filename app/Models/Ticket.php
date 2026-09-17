@@ -36,6 +36,7 @@ class Ticket extends Model
         'office_code',
         'office_desc',
         'solution_id',
+        'related_ticket_id',
         'ticket_number',
         'full_name',
         'client_name',
@@ -47,6 +48,7 @@ class Ticket extends Model
         'date',
         'accepted_at',
         'resolved_at',
+        'reopened_at',
         'released_at',
         'released_by',
         'contact_number',
@@ -62,6 +64,7 @@ class Ticket extends Model
         'service_method' => ServiceMethod::class,
         'accepted_at' => 'datetime',
         'resolved_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
 
     public static function generateTicketNumber(): string
@@ -143,6 +146,25 @@ class Ticket extends Model
     public function assessment()
     {
         return $this->hasOne(TicketAssessment::class);
+    }
+
+    public function resolutions()
+    {
+        return $this->hasMany(TicketResolution::class)
+            ->orderByDesc('resolved_at')
+            ->orderByDesc('id');
+    }
+
+    public function relatedTicket()
+    {
+        return $this->belongsTo(Ticket::class, 'related_ticket_id');
+    }
+
+    // The reverse side: other tickets that were filed as a recurrence of
+    // this one.
+    public function recurrences()
+    {
+        return $this->hasMany(Ticket::class, 'related_ticket_id');
     }
 
     public function complexityLevel()

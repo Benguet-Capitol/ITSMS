@@ -52,6 +52,9 @@ class TicketController extends Controller
             'solution.author',
             'personnel',
             'assessment',
+            'relatedTicket',
+            'recurrences',
+            'resolutions.solution',
         ]);
 
         if ($request->filled('search')) {
@@ -259,6 +262,42 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
+    public function search(Request $request)
+    {
+        Gate::authorize('tickets.search');
+
+        $query = trim($request->string('q')->toString());
+
+        $limit = min(max($request->integer('limit', 20), 1), 100);
+
+        $tickets = Ticket::query()
+            ->without(['profile', 'employee', 'inventory.parent_component', 'itService', 'personnel', 'item_type', 'solution', 'agency', 'complexityLevel'])
+            ->when($query !== '', function ($builder) use ($query) {
+                $builder->where(function ($builder) use ($query) {
+                    $builder
+                        ->where('ticket_number', 'like', "%{$query}%")
+                        ->orWhere('concern', 'like', "%{$query}%");
+                });
+            })
+            ->when($request->filled('exclude'), function ($builder) use ($request) {
+                $builder->whereKeyNot($request->input('exclude'));
+            })
+            ->latest()
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'data' => $tickets->map(fn (Ticket $ticket) => [
+                'id' => $ticket->id,
+                'ticket_number' => $ticket->ticket_number,
+                'concern' => $ticket->concern,
+                'query_status' => $ticket->query_status,
+                'request_status' => $ticket->request_status,
+                'resolved_at' => $ticket->resolved_at,
+            ]),
+        ]);
+    }
+
     public function show(Ticket $ticket)
     {
         Gate::authorize('tickets.view');
@@ -275,6 +314,9 @@ class TicketController extends Controller
                 'solution',
                 'agency',
                 'assessment',
+                'resolutions.solution',
+                'relatedTicket',
+                'recurrences',
             ])
             ->withCount([
                 'personnel as personnel_count',
@@ -398,11 +440,19 @@ class TicketController extends Controller
         Gate::authorize('tickets.update');
         $data = $request->validated();
 
+        $resolvedAt = now();
         $data['query_status'] = TicketStatus::Resolved;
         $data['request_status'] = TicketStatus::Closed;
-        $data['resolved_at'] = now();
+        $data['resolved_at'] = $resolvedAt;
 
         $ticket->update($data);
+        $user = Auth::user();
+        $ticket->resolutions()->create([
+            'solution_id' => $data['solution_id'],
+            'service_method' => $data['service_method'] ?? null,
+            'resolved_by' => $user->profile?->formatted_name ?? $user->name,
+            'resolved_at' => $resolvedAt,
+        ]);
 
         ProfileEngagementService::syncTicket($ticket);
 
@@ -430,11 +480,8 @@ class TicketController extends Controller
         $ticket->update([
             'query_status' => TicketStatus::InProgress,
             'request_status' => TicketStatus::Reopened,
-            // accepted_at is left untouched -- it records when the ticket
-            // was originally accepted, which reopening doesn't change.
-            // Only resolved_at is cleared, since the ticket is no longer
-            // resolved.
             'resolved_at' => null,
+            'reopened_at' => now(),
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
