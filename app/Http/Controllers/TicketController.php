@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\TicketStatus;
 use App\Http\Requests\AssessTicketRequest;
+use App\Http\Requests\CancelTicketRequest;
 use App\Http\Requests\ResolveTicketRequest;
 use App\Http\Requests\SetTicketReleaseDateRequest;
 use App\Http\Requests\SetTicketServiceMethodRequest;
@@ -459,12 +460,13 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
-    public function cancel(Request $request, Ticket $ticket)
+    public function cancel(CancelTicketRequest $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
         $ticket->update([
             'query_status' => TicketStatus::Cancelled,
             'request_status' => TicketStatus::Closed,
+            'cancellation_reason' => $request->validated('reason'),
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
@@ -482,6 +484,7 @@ class TicketController extends Controller
             'request_status' => TicketStatus::Reopened,
             'resolved_at' => null,
             'reopened_at' => now(),
+            'cancellation_reason' => null,
         ]);
 
         ProfileEngagementService::syncTicket($ticket);

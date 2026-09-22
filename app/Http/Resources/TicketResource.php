@@ -77,6 +77,7 @@ class TicketResource extends JsonResource
             'reopened_at' => $this->reopened_at,
             'released_at' => $this->released_at,
             'released_by' => $this->released_by,
+            'cancellation_reason' => $this->cancellation_reason,
             'contact_number' => $this->contact_number,
             'full_name' => $this->full_name,
             'client_name' => $this->client_name,

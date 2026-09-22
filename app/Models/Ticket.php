@@ -51,6 +51,7 @@ class Ticket extends Model
         'reopened_at',
         'released_at',
         'released_by',
+        'cancellation_reason',
         'contact_number',
         'is_other_agency',
         'quality',
