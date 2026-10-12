@@ -7,6 +7,8 @@ use App\Http\Requests\UpdateInventoryRequest;
 use App\Http\Resources\InventoryResource;
 use App\Models\Inventory;
 use App\Models\InventoryInternalComponent;
+use App\Models\Ticket;
+use App\Models\TicketResolution;
 use App\Services\HrisClientService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -357,6 +359,38 @@ class InventoryController extends Controller
 
         return response()->json([
             'data' => InventoryResource::collection($inventories),
+        ]);
+    }
+
+    public function repairHistory(Inventory $inventory)
+    {
+        Gate::authorize('inventories.view');
+
+        $tickets = $inventory->tickets()
+            ->with(['resolutions.solution', 'itService'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        return response()->json([
+            'data' => $tickets->map(function (Ticket $ticket) {
+                return [
+                    'ticket_number' => $ticket->ticket_number,
+                    'concern' => $ticket->concern,
+                    'category' => $ticket->itService?->name,
+                    'query_status' => $ticket->query_status?->value,
+                    'request_status' => $ticket->request_status?->value,
+                    'accepted_at' => $ticket->accepted_at,
+                    'resolved_at' => $ticket->resolved_at,
+                    'resolutions' => $ticket->resolutions->map(function (TicketResolution $resolution) {
+                        return [
+                            'solution' => $resolution->solution?->title,
+                            'service_method' => $resolution->service_method?->value,
+                            'resolved_by' => $resolution->resolved_by,
+                            'resolved_at' => $resolution->resolved_at,
+                        ];
+                    }),
+                ];
+            }),
         ]);
     }
 

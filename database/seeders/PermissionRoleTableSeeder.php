@@ -60,28 +60,19 @@ class PermissionRoleTableSeeder extends Seeder
             [17, 2], [18, 2], [81, 2], [94, 2],
             [84, 3],
 
-            // Ticket Complexity Levels module (added 2026-09-09): Admin and
-            // It Admin Staff manage the lookup table (mirrors their
-            // measurement_units access); It Technical and User only need
-            // to select a level when creating/editing a ticket (mirrors
-            // their item_types.select/measurement_units.select access).
             [96, 1], [97, 1], [98, 1], [99, 1], [100, 1],
             [96, 2], [97, 2], [98, 2], [99, 2], [100, 2],
             [100, 3],
             [100, 5],
 
-            // Common Problems module (added 2026-09-10): CRUD management
-            // granted to Admin/It Admin Staff/Encoder, mirroring the
-            // existing Brand Models reference-data pattern (permissions
-            // 44-47) -- another item-type-scoped lookup table Encoder
-            // already maintains. .select is granted to whichever roles can
-            // actually create/update tickets (mirrors tickets.create,
-            // permission 3), since that's the only place it's consumed.
             [101, 1], [102, 1], [103, 1], [104, 1], [105, 1],
             [101, 2], [102, 2], [103, 2], [104, 2], [105, 2],
             [101, 4], [102, 4], [103, 4], [104, 4],
             [105, 3],
             [105, 5],
+
+            [106, 1], [106, 2], [106, 3],
+            [107, 1], [107, 2], [107, 3],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);

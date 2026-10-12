@@ -79,6 +79,11 @@ class Inventory extends Model
         return $this->hasMany(InventoryInternalComponent::class);
     }
 
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class, 'inventory_id');
+    }
+
     public function getComputedBrandModelSearchAttribute(): ?string
     {
         if (! $this->relationLoaded('item_type')) {

@@ -7,6 +7,7 @@ use App\Models\Inventory;
 use App\Models\ItemType;
 use App\Services\HrisClientService;
 use App\Services\PdfImageService;
+use App\Services\WordReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -89,6 +90,58 @@ class InventoryReportController extends Controller
 
             return response()->json([
                 'message' => 'Failed to generate Excel report.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function exportWord(Request $request, HrisClientService $hris, WordReportService $wordReports)
+    {
+        Gate::authorize('inventories.report');
+
+        try {
+            $rows = $this->getReportRows($request, $hris);
+
+            $table = $rows->map(fn ($row) => [
+                $row['property_number'],
+                $row['employee_name'],
+                $row['office'],
+                $row['division'],
+                $row['item_type'],
+                $row['brand_model'],
+                $row['status'],
+                $row['date_acquired'],
+            ])->all();
+
+            $content = $wordReports->build(
+                'Inventory Report',
+                [[
+                    'headings' => ['Property Number', 'Employee Name', 'Office', 'Division', 'Item Type', 'Brand / Model', 'Status', 'Date Acquired'],
+                    'rows' => $table,
+                ]],
+                'Generated as of '.now()->format('Y-m-d h:i A').' — Total Records: '.$rows->count()
+            );
+
+            $filenameParts = ['Inventory-Report', now()->format('Y-m-d_Hi')];
+            $filename = implode('_', array_map(
+                fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', $part),
+                $filenameParts
+            )).'.docx';
+
+            return response($content, 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+                'Content-Length' => strlen($content),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Inventory Word export failed', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'message' => 'Failed to generate Word report.',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -274,6 +327,17 @@ class InventoryReportController extends Controller
             });
         }
 
+        if ($request->filled('year')) {
+            $year = (int) $request->input('year');
+
+            $query->where(function ($q) use ($year) {
+                $q->whereYear('inventories.date_acquired', $year)
+                    ->orWhereHas('parent_component', function ($q2) use ($year) {
+                        $q2->whereYear('date_acquired', $year);
+                    });
+            });
+        }
+
         return $query
             ->leftJoin('inventories as parent_inv', 'inventories.parent_component_id', '=', 'parent_inv.id')
             ->select('inventories.*')
@@ -378,7 +442,8 @@ class InventoryReportController extends Controller
                     'is_primary' => in_array(strtolower($inventory->item_type?->type ?? ''), ['system unit', 'laptop']),
                     'is_obsolete' => $isObsolete,
                 ];
-            });
+            })
+            ->when($request->boolean('end_of_life'), fn ($rows) => $rows->where('is_obsolete', true)->values());
     }
 
     private function getReportQuery(Request $request)

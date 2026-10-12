@@ -8,11 +8,6 @@ use Illuminate\Support\Facades\DB;
 class PermissionSeeder extends Seeder
 {
     /**
-     * Seed the exact 95 permissions as they exist in production (snapshot
-     * captured 2026-09-03). ids 1-66 are the original 2026-06-24 base set;
-     * ids 67-95 were added later on 2026-08-24 (ticket lifecycle actions,
-     * search/select lookups). IDs are preserved exactly to match the
-     * permission_role snapshot in PermissionRoleTableSeeder.
      */
     public function run(): void
     {
@@ -56,25 +51,21 @@ class PermissionSeeder extends Seeder
             94 => 'employees.search', 95 => 'offices.search',
         ];
 
-        // Ticket Complexity Levels module (added 2026-09-09, replacing the
-        // hardcoded priority/complexity enum with an admin-managed table).
         $newestTitles = [
             96 => 'ticket_complexity_levels.view', 97 => 'ticket_complexity_levels.create',
             98 => 'ticket_complexity_levels.update', 99 => 'ticket_complexity_levels.delete',
             100 => 'ticket_complexity_levels.select',
         ];
 
-        // Common Problems module (permissions added 2026-09-10): the table,
-        // model, CRUD screen and requests already existed, but no
-        // common_problems.* permission was ever seeded, so every
-        // Gate::authorize('common_problems.*') call in
-        // CommonProblemController was unreachable for every role,
-        // including Admin. Added here alongside the new .select lookup
-        // that wires it into Tickets' concern field.
         $commonProblemsTitles = [
             101 => 'common_problems.view', 102 => 'common_problems.create',
             103 => 'common_problems.update', 104 => 'common_problems.delete',
             105 => 'common_problems.select',
+        ];
+
+        $reportingModuleTitles = [
+            106 => 'tickets.report',
+            107 => 'requests.other_it_services.report',
         ];
 
         $rows = [];
@@ -88,6 +79,9 @@ class PermissionSeeder extends Seeder
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
         foreach ($commonProblemsTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($reportingModuleTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
 

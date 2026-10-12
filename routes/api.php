@@ -15,6 +15,7 @@ use App\Http\Controllers\ItSupplyController;
 use App\Http\Controllers\MeasurementUnitController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
+use App\Http\Controllers\OtherItServiceReportController;
 use App\Http\Controllers\OtherItServiceRequestController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SolutionController;
 use App\Http\Controllers\TicketComplexityLevelController;
 use App\Http\Controllers\TicketController;
+use App\Http\Controllers\TicketReportController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\AuthGates;
 use App\Http\Resources\UserResource;
@@ -132,6 +134,10 @@ Route::middleware([
     ]);
     Route::apiResource('common-problems', CommonProblemController::class);
     Route::apiResource('inventories', InventoryController::class);
+    Route::get('inventories/{inventory}/repair-history', [
+        InventoryController::class,
+        'repairHistory',
+    ])->middleware('can:inventories.view');
     Route::apiResource('it-services', ItServiceController::class);
     Route::apiResource('tickets', TicketController::class);
     Route::apiResource('solutions', SolutionController::class);
@@ -374,6 +380,70 @@ Route::middleware([
             InventoryReportController::class,
             'exportPdf',
         ])->middleware('can:inventories.report');
+
+        Route::get('word', [
+            InventoryReportController::class,
+            'exportWord',
+        ])->middleware('can:inventories.report');
+    });
+
+    Route::prefix('tickets/reports')->group(function () {
+        Route::get('technicians', [
+            TicketReportController::class,
+            'technicianSelect',
+        ])->middleware('can:tickets.report');
+
+        Route::get('excel', [
+            TicketReportController::class,
+            'exportExcel',
+        ])->middleware('can:tickets.report');
+
+        Route::get('pdf', [
+            TicketReportController::class,
+            'exportPdf',
+        ])->middleware('can:tickets.report');
+
+        Route::get('word', [
+            TicketReportController::class,
+            'exportWord',
+        ])->middleware('can:tickets.report');
+
+        Route::get('technician-performance/excel', [
+            TicketReportController::class,
+            'technicianPerformanceExcel',
+        ])->middleware('can:tickets.report');
+
+        Route::get('technician-performance/pdf', [
+            TicketReportController::class,
+            'technicianPerformancePdf',
+        ])->middleware('can:tickets.report');
+
+        Route::get('technician-performance/word', [
+            TicketReportController::class,
+            'technicianPerformanceWord',
+        ])->middleware('can:tickets.report');
+    });
+
+    Route::prefix('other-it-service-requests/reports')->group(function () {
+        Route::get('summary', [
+            OtherItServiceReportController::class,
+            'summary',
+        ])->middleware('can:requests.other_it_services.report');
+
+        Route::get('excel', [
+            OtherItServiceReportController::class,
+            'exportExcel',
+        ])->middleware('can:requests.other_it_services.report');
+
+        Route::get('pdf', [
+            OtherItServiceReportController::class,
+            'exportPdf',
+        ])->middleware('can:requests.other_it_services.report');
+
+        Route::get('word', [
+            OtherItServiceReportController::class,
+            'exportWord',
+        ])->middleware('can:requests.other_it_services.report');
     });
 
     /*

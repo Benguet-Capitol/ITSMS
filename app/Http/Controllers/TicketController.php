@@ -149,7 +149,11 @@ class TicketController extends Controller
         }
 
         if ($request->filled('query_status')) {
-            $query->where('query_status', $request->query_status);
+            if ($request->query_status === TicketStatus::Reopened->value) {
+                $query->where('request_status', TicketStatus::Reopened);
+            } else {
+                $query->where('query_status', $request->query_status);
+            }
         }
 
         $sortable = [
