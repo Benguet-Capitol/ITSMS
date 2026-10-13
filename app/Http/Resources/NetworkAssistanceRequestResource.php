@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Http\Resources;
+
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class NetworkAssistanceRequestResource extends JsonResource
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id,
+            'control_number' => $this->control_number,
+            'status' => $this->status,
+
+            'date_of_request' => $this->date_of_request?->format('Y-m-d'),
+            'department_office' => $this->department_office,
+            'requestor_name' => $this->requestor_name,
+
+            'service_wifi_installation' => $this->service_wifi_installation,
+            'service_ethernet_wiring' => $this->service_ethernet_wiring,
+            'service_network_planning' => $this->service_network_planning,
+            'service_other_support' => $this->service_other_support,
+            'service_other_specify' => $this->service_other_specify,
+            'services' => $this->serviceLabels(),
+
+            'program_activity_details' => $this->program_activity_details,
+            'activity_date' => $this->activity_date?->format('Y-m-d'),
+            'activity_end_date' => $this->activity_end_date?->format('Y-m-d'),
+            'activity_time' => $this->activityTimeHm(),
+            'venue' => $this->venue,
+
+            'assigned_personnel' => $this->assigned_personnel,
+            'date_received' => $this->date_received?->format('Y-m-d'),
+            'action_taken' => $this->action_taken,
+
+            'feedback_rating' => $this->feedback_rating,
+            'feedback_name' => $this->feedback_name,
+            'feedback_date' => $this->feedback_date?->format('Y-m-d'),
+
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
+    }
+}

@@ -4,15 +4,21 @@ use App\Enums\TicketStatus;
 use App\Http\Controllers\AgencyController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\BrandModelController;
+use App\Http\Controllers\CctvFootageRequestController;
 use App\Http\Controllers\CommonProblemController;
 use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\DesignRequestController;
+use App\Http\Controllers\DocumentationRequestController;
+use App\Http\Controllers\DtsUserRequestController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryReportController;
+use App\Http\Controllers\IsChangeRequestController;
 use App\Http\Controllers\ItemTypeController;
 use App\Http\Controllers\ItServiceController;
 use App\Http\Controllers\ItSupplyController;
 use App\Http\Controllers\MeasurementUnitController;
+use App\Http\Controllers\NetworkAssistanceRequestController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OtherItServiceReportController;
@@ -152,6 +158,30 @@ Route::middleware([
     Route::apiResource(
         'other-it-service-requests',
         OtherItServiceRequestController::class
+    );
+    Route::apiResource(
+        'cctv-footage-requests',
+        CctvFootageRequestController::class
+    );
+    Route::apiResource(
+        'documentation-requests',
+        DocumentationRequestController::class
+    );
+    Route::apiResource(
+        'network-assistance-requests',
+        NetworkAssistanceRequestController::class
+    );
+    Route::apiResource(
+        'design-requests',
+        DesignRequestController::class
+    );
+    Route::apiResource(
+        'dts-user-requests',
+        DtsUserRequestController::class
+    );
+    Route::apiResource(
+        'is-change-requests',
+        IsChangeRequestController::class
     );
 
     /*
@@ -452,13 +482,100 @@ Route::middleware([
     |--------------------------------------------------------------------------
     */
 
-    Route::post(
+    // GET, not POST: it only downloads the PDF, and the frontend (like the
+    // CCTV and ticket assessment printouts) fetches it with GET -- as POST
+    // every Print click failed with 405.
+    Route::get(
         'other-it-service-requests/{otherItServiceRequest}/print',
         [
             OtherItServiceRequestController::class,
             'print',
         ]
     )->middleware('can:requests.other_it_services.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | CCTV footage request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'cctv-footage-requests/{cctv_footage_request}/print',
+        [
+            CctvFootageRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.cctv_footage.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Documentation request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'documentation-requests/{documentation_request}/print',
+        [
+            DocumentationRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.documentation.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Network assistance request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'network-assistance-requests/{network_assistance_request}/print',
+        [
+            NetworkAssistanceRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.network_assistance.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Design/lay-out/editing request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'design-requests/{design_request}/print',
+        [
+            DesignRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.design.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | DTS user request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'dts-user-requests/{dts_user_request}/print',
+        [
+            DtsUserRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.dts_user.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Information system change request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'is-change-requests/{is_change_request}/print',
+        [
+            IsChangeRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.is_change.print');
 
     /*
     |--------------------------------------------------------------------------

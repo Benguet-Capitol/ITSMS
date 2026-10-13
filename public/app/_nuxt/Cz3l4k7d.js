@@ -1,0 +1,1 @@
+import{L as e}from"./Car86Ubo.js";function t(){let t=e()?.vnode?.scopeId;return t?{[t]:``}:{}}export{t};

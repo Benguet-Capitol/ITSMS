@@ -23,11 +23,14 @@ class OtherItServiceRequest extends Model
         'service_others',
         'service_qty',
         'service_laptop_tv_setup',
+        'service_ledwall_eoc',
+        'service_other_service',
         'service_others_specify',
 
         'program_activity_details',
         'activity_date_text',
         'activity_time',
+        'activity_venue',
 
         'assigned_personnel',
         'date_received',
@@ -36,6 +39,25 @@ class OtherItServiceRequest extends Model
         'feedback_rating',
         'feedback_name',
         'feedback_date',
+    ];
+
+    /**
+     * Mirrors the column defaults so a just-created record returns false
+     * (not null) for services that weren't ticked.
+     */
+    protected $attributes = [
+        'status' => 'pending',
+        'service_printing' => false,
+        'service_information_material' => false,
+        'service_program_paper' => false,
+        'service_brochure' => false,
+        'service_iec_material' => false,
+        'service_handbook' => false,
+        'service_certificates' => false,
+        'service_others' => false,
+        'service_laptop_tv_setup' => false,
+        'service_ledwall_eoc' => false,
+        'service_other_service' => false,
     ];
 
     protected $casts = [
@@ -51,5 +73,7 @@ class OtherItServiceRequest extends Model
         'service_certificates' => 'boolean',
         'service_others' => 'boolean',
         'service_laptop_tv_setup' => 'boolean',
+        'service_ledwall_eoc' => 'boolean',
+        'service_other_service' => 'boolean',
     ];
 }

@@ -33,11 +33,14 @@ class OtherItServiceRequestResource extends JsonResource
             'service_others' => $this->service_others,
             'service_qty' => $this->service_qty,
             'service_laptop_tv_setup' => $this->service_laptop_tv_setup,
+            'service_ledwall_eoc' => $this->service_ledwall_eoc,
+            'service_other_service' => $this->service_other_service,
             'service_others_specify' => $this->service_others_specify,
 
             'program_activity_details' => $this->program_activity_details,
             'activity_date_text' => $this->activity_date_text,
             'activity_time' => $this->activity_time,
+            'activity_venue' => $this->activity_venue,
 
             'assigned_personnel' => $this->assigned_personnel,
             'date_received' => $this->date_received,

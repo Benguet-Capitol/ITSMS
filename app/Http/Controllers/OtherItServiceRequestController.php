@@ -25,7 +25,9 @@ class OtherItServiceRequestController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('control_number', 'LIKE', "%{$search}%")
                     ->orWhere('requestor_name', 'LIKE', "%{$search}%")
-                    ->orWhere('department_office', 'LIKE', "%{$search}%");
+                    ->orWhere('department_office', 'LIKE', "%{$search}%")
+                    ->orWhere('program_activity_details', 'LIKE', "%{$search}%")
+                    ->orWhere('activity_venue', 'LIKE', "%{$search}%");
             });
         }
 

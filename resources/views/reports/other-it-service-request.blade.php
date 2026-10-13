@@ -81,6 +81,17 @@
             width: 100%;
         }
 
+        .underline.inline {
+            display: inline-block;
+            width: 70%;
+        }
+
+        .note {
+            font-size: 8px;
+            font-style: italic;
+            color: #374151;
+        }
+
         .box {
             border: 1px solid #333;
             width: 9px;
@@ -178,7 +189,7 @@
 
     <table class="top-line">
         <tr>
-            <td>PLGU-BENGUET|ICT-09-V2|2025</td>
+            <td>PLGU-BENGUET|ICT-09-V1|2026</td>
             <td>PGO-IT/MIS FILE</td>
         </tr>
     </table>
@@ -231,15 +242,27 @@
         </tr>
         <tr>
             <td></td>
-            <td colspan="4">
+            <td colspan="2">
                 <span class="box">{{ $checked($requestRecord->service_laptop_tv_setup) }}</span>
                 Set-up of laptop/TV for Meetings/Activities
+            </td>
+            <td colspan="2">
+                <span class="box">{{ $checked($requestRecord->service_ledwall_eoc) }}</span>
+                Ledwall and Sound System at EOC
+            </td>
+        </tr>
+        <tr>
+            <td></td>
+            <td colspan="2"></td>
+            <td colspan="2" class="note">
+                Note: Kindly coordinate with the IT Office once the meeting has concluded for the shutdown of the LED Wall.
             </td>
         </tr>
         <tr>
             <td></td>
             <td colspan="4">
-                Others (Please Specify): <span class="underline">{{ $requestRecord->service_others_specify }}</span>
+                <span class="box">{{ $checked($requestRecord->service_other_service) }}</span>
+                Others: (Please Specify): <span class="underline inline">{{ $requestRecord->service_others_specify }}</span>
             </td>
         </tr>
     </table>
@@ -247,11 +270,13 @@
     <table class="section">
         <tr>
             <td class="label">Program/Activity details:</td>
-            <td><span class="underline">{{ $requestRecord->program_activity_details }}</span></td>
+            <td colspan="3"><span class="underline">{{ $requestRecord->program_activity_details }}</span></td>
         </tr>
         <tr>
             <td class="label">Date and Time of Activity:</td>
             <td><span class="underline">{{ $activityDisplay }}</span></td>
+            <td class="label">Venue:</td>
+            <td style="width:30%"><span class="underline">{{ $requestRecord->activity_venue }}</span></td>
         </tr>
     </table>
 
@@ -268,7 +293,7 @@
             <td><span class="underline">{{ $dateReceived }}</span></td>
         </tr>
         <tr>
-            <td class="label">Action Taken:</td>
+            <td class="label">Action Taken or Remarks:</td>
             <td><span class="underline">{{ $requestRecord->action_taken }}</span></td>
         </tr>
     </table>
@@ -316,7 +341,7 @@
 
     <table class="top-line">
         <tr>
-            <td>PLGU-BENGUET|ICT-09-V3|2026</td>
+            <td>PLGU-BENGUET|ICT-09-V1|2026</td>
             <td>CLIENT FILE</td>
         </tr>
     </table>
@@ -369,15 +394,27 @@
         </tr>
         <tr>
             <td></td>
-            <td colspan="4">
+            <td colspan="2">
                 <span class="box">{{ $checked($requestRecord->service_laptop_tv_setup) }}</span>
                 Set-up of laptop/TV for Meetings/Activities
+            </td>
+            <td colspan="2">
+                <span class="box">{{ $checked($requestRecord->service_ledwall_eoc) }}</span>
+                Ledwall and Sound System at EOC
+            </td>
+        </tr>
+        <tr>
+            <td></td>
+            <td colspan="2"></td>
+            <td colspan="2" class="note">
+                Note: Kindly coordinate with the IT Office once the meeting has concluded for the shutdown of the LED Wall.
             </td>
         </tr>
         <tr>
             <td></td>
             <td colspan="4">
-                Others (Please Specify): <span class="underline">{{ $requestRecord->service_others_specify }}</span>
+                <span class="box">{{ $checked($requestRecord->service_other_service) }}</span>
+                Others: (Please Specify): <span class="underline inline">{{ $requestRecord->service_others_specify }}</span>
             </td>
         </tr>
     </table>
@@ -385,11 +422,13 @@
     <table class="section">
         <tr>
             <td class="label">Program/Activity details:</td>
-            <td><span class="underline">{{ $requestRecord->program_activity_details }}</span></td>
+            <td colspan="3"><span class="underline">{{ $requestRecord->program_activity_details }}</span></td>
         </tr>
         <tr>
             <td class="label">Date and Time of Activity:</td>
             <td><span class="underline">{{ $activityDisplay }}</span></td>
+            <td class="label">Venue:</td>
+            <td style="width:30%"><span class="underline">{{ $requestRecord->activity_venue }}</span></td>
         </tr>
     </table>
 

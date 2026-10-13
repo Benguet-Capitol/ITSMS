@@ -73,6 +73,36 @@ class PermissionRoleTableSeeder extends Seeder
 
             [106, 1], [106, 2], [106, 3],
             [107, 1], [107, 2], [107, 3],
+
+            // Request for CCTV Footage -- same roles as Other IT Services
+            [108, 1], [109, 1], [110, 1], [111, 1], [112, 1],
+            [108, 2], [109, 2], [110, 2], [111, 2], [112, 2],
+            [108, 3], [109, 3], [110, 3], [111, 3], [112, 3],
+
+            // Request for Documentation -- same roles as the other request modules
+            [113, 1], [114, 1], [115, 1], [116, 1], [117, 1],
+            [113, 2], [114, 2], [115, 2], [116, 2], [117, 2],
+            [113, 3], [114, 3], [115, 3], [116, 3], [117, 3],
+
+            // Request for Network Assistance -- same roles as the other request modules
+            [118, 1], [119, 1], [120, 1], [121, 1], [122, 1],
+            [118, 2], [119, 2], [120, 2], [121, 2], [122, 2],
+            [118, 3], [119, 3], [120, 3], [121, 3], [122, 3],
+
+            // Request for Design/Lay-out/Editing -- same roles as the other request modules
+            [123, 1], [124, 1], [125, 1], [126, 1], [127, 1],
+            [123, 2], [124, 2], [125, 2], [126, 2], [127, 2],
+            [123, 3], [124, 3], [125, 3], [126, 3], [127, 3],
+
+            // Request for New DTS User / Update of User Details -- same roles as the other request modules
+            [128, 1], [129, 1], [130, 1], [131, 1], [132, 1],
+            [128, 2], [129, 2], [130, 2], [131, 2], [132, 2],
+            [128, 3], [129, 3], [130, 3], [131, 3], [132, 3],
+
+            // Request for Change or Modification of Information System -- same roles as the other request modules
+            [133, 1], [134, 1], [135, 1], [136, 1], [137, 1],
+            [133, 2], [134, 2], [135, 2], [136, 2], [137, 2],
+            [133, 3], [134, 3], [135, 3], [136, 3], [137, 3],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);

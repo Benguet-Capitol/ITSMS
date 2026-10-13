@@ -9,6 +9,17 @@ use Illuminate\Validation\Rule;
 class UpdateOtherItServiceRequest extends FormRequest
 {
     /**
+     * "Others: (Please Specify)" belongs to the standalone Other service
+     * checkbox, so unticking it drops any leftover specify text.
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->boolean('service_other_service')) {
+            $this->merge(['service_others_specify' => null]);
+        }
+    }
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
@@ -45,11 +56,19 @@ class UpdateOtherItServiceRequest extends FormRequest
             'service_others' => ['nullable', 'boolean'],
             'service_qty' => ['nullable', 'integer', 'min:1'],
             'service_laptop_tv_setup' => ['nullable', 'boolean'],
-            'service_others_specify' => ['nullable', 'string'],
+            'service_ledwall_eoc' => ['nullable', 'boolean'],
+            'service_other_service' => ['nullable', 'boolean'],
+            'service_others_specify' => [
+                'nullable',
+                'string',
+                'max:1000',
+                Rule::requiredIf(fn () => $this->boolean('service_other_service')),
+            ],
 
             'program_activity_details' => ['nullable', 'string'],
             'activity_date_text' => ['nullable', 'string', 'max:255'],
             'activity_time' => ['nullable', 'string', 'max:50'],
+            'activity_venue' => ['nullable', 'string', 'max:255'],
 
             'assigned_personnel' => ['nullable', 'string', 'max:255'],
             'date_received' => ['nullable', 'date'],

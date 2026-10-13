@@ -68,6 +68,42 @@ class PermissionSeeder extends Seeder
             107 => 'requests.other_it_services.report',
         ];
 
+        $cctvFootageTitles = [
+            108 => 'requests.cctv_footage.view', 109 => 'requests.cctv_footage.create',
+            110 => 'requests.cctv_footage.update', 111 => 'requests.cctv_footage.print',
+            112 => 'requests.cctv_footage.delete',
+        ];
+
+        $documentationTitles = [
+            113 => 'requests.documentation.view', 114 => 'requests.documentation.create',
+            115 => 'requests.documentation.update', 116 => 'requests.documentation.print',
+            117 => 'requests.documentation.delete',
+        ];
+
+        $networkAssistanceTitles = [
+            118 => 'requests.network_assistance.view', 119 => 'requests.network_assistance.create',
+            120 => 'requests.network_assistance.update', 121 => 'requests.network_assistance.print',
+            122 => 'requests.network_assistance.delete',
+        ];
+
+        $designTitles = [
+            123 => 'requests.design.view', 124 => 'requests.design.create',
+            125 => 'requests.design.update', 126 => 'requests.design.print',
+            127 => 'requests.design.delete',
+        ];
+
+        $dtsUserTitles = [
+            128 => 'requests.dts_user.view', 129 => 'requests.dts_user.create',
+            130 => 'requests.dts_user.update', 131 => 'requests.dts_user.print',
+            132 => 'requests.dts_user.delete',
+        ];
+
+        $isChangeTitles = [
+            133 => 'requests.is_change.view', 134 => 'requests.is_change.create',
+            135 => 'requests.is_change.update', 136 => 'requests.is_change.print',
+            137 => 'requests.is_change.delete',
+        ];
+
         $rows = [];
         foreach ($baseTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => $base, 'updated_at' => $base];
@@ -82,6 +118,24 @@ class PermissionSeeder extends Seeder
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
         foreach ($reportingModuleTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($cctvFootageTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($documentationTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($networkAssistanceTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($designTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($dtsUserTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($isChangeTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
 
