@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\DateSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,16 @@ class StoreOtherItServiceRequest extends FormRequest
         if (! $this->boolean('service_other_service')) {
             $this->merge(['service_others_specify' => null]);
         }
+
+        $this->merge(DateSchedule::prepare($this->all(), ['time' => 'activity_time']));
+    }
+
+    public function messages(): array
+    {
+        return [
+            ...DateSchedule::messages('schedule', 'date of activity'),
+            'activity_time.prohibited' => DateSchedule::SHARED_TIME_MESSAGE,
+        ];
     }
 
     /**
@@ -61,8 +72,10 @@ class StoreOtherItServiceRequest extends FormRequest
             ],
 
             'program_activity_details' => ['nullable', 'string'],
-            'activity_date_text' => ['nullable', 'string', 'max:255'],
-            'activity_time' => ['nullable', 'string', 'max:50'],
+            // activity_date_text is written from the schedule by the model.
+            // One time for all dates, or a time per date when they differ.
+            ...DateSchedule::rules('schedule', required: false, time: DateSchedule::TIME_TEXT),
+            'activity_time' => ['nullable', 'string', 'max:50', DateSchedule::sharedTimeRule($this->input('schedule'))],
             'activity_venue' => ['nullable', 'string', 'max:255'],
 
             'assigned_personnel' => ['nullable', 'string', 'max:255'],

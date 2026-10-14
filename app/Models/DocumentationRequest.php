@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasDateSchedule;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
 class DocumentationRequest extends Model
 {
-    use HasYearlyControlNumber;
+    use HasDateSchedule, HasYearlyControlNumber;
 
     /** Same lifecycle as Other IT Service requests -- the form has no approval chain. */
     public const STATUSES = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'];
@@ -68,5 +69,15 @@ class DocumentationRequest extends Model
             fn (string $label, string $column) => (bool) $this->{$column},
             ARRAY_FILTER_USE_BOTH,
         ));
+    }
+
+    /** First and last scheduled day; the end stays null for a single day. */
+    protected function syncScheduleColumns(): void
+    {
+        $start = $this->scheduleStart();
+        $end = $this->scheduleEnd();
+
+        $this->documentation_date = $start;
+        $this->documentation_end_date = $end !== $start ? $end : null;
     }
 }

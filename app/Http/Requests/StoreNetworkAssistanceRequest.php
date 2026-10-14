@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\NetworkAssistanceRequest;
+use App\Support\DateSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -39,9 +40,9 @@ class StoreNetworkAssistanceRequest extends FormRequest
             'services' => ['array', 'min:1'],
 
             'program_activity_details' => ['required', 'string', 'max:5000'],
-            'activity_date' => ['required', 'date'],
-            'activity_end_date' => ['nullable', 'date', 'after_or_equal:activity_date'],
-            'activity_time' => ['nullable', 'date_format:H:i'],
+            // One time for all dates, or a time per date when they differ.
+            ...DateSchedule::rules(time: DateSchedule::TIME_POINT),
+            'activity_time' => ['nullable', 'date_format:H:i', DateSchedule::sharedTimeRule($this->input('schedule'))],
             'venue' => ['required', 'string', 'max:255'],
         ];
     }
@@ -49,7 +50,8 @@ class StoreNetworkAssistanceRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'activity_end_date.after_or_equal' => 'The end date cannot be before the date of the activity.',
+            ...DateSchedule::messages('schedule', 'date of activity'),
+            'activity_time.prohibited' => DateSchedule::SHARED_TIME_MESSAGE,
             'services.min' => 'Select at least one network service.',
             'service_other_specify.required' => 'Please specify the other network IT support needed.',
         ];
@@ -79,5 +81,7 @@ class StoreNetworkAssistanceRequest extends FormRequest
         if (! $this->boolean('service_other_support')) {
             $this->merge(['service_other_specify' => null]);
         }
+
+        $this->merge(DateSchedule::prepare($this->all(), ['time' => 'activity_time']));
     }
 }

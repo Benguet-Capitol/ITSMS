@@ -38,6 +38,7 @@ class OtherItServiceRequestResource extends JsonResource
             'service_others_specify' => $this->service_others_specify,
 
             'program_activity_details' => $this->program_activity_details,
+            'schedule' => $this->schedule ?? [],
             'activity_date_text' => $this->activity_date_text,
             'activity_time' => $this->activity_time,
             'activity_venue' => $this->activity_venue,

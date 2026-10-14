@@ -148,10 +148,10 @@
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
 
-    $schedule = $longDate($record->activity_date);
-    if ($record->activity_end_date && ! $record->activity_end_date->equalTo($record->activity_date)) {
-        $schedule .= ' to '.$longDate($record->activity_end_date);
-    }
+    // e.g. "October 2 to 4 and 7, 2026, 8:00 AM", or with a time per date
+    // "October 2, 2026 (8:00 AM); October 5, 2026 (1:00 PM)" -- the shared
+    // time is empty then.
+    $schedule = $record->scheduleText() ?? $longDate($record->activity_date);
     if ($record->activityTimeHm()) {
         $schedule .= ', '.\Carbon\Carbon::createFromFormat('H:i', $record->activityTimeHm())->format('g:i A');
     }

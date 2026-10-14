@@ -27,6 +27,8 @@ class DocumentationRequestResource extends JsonResource
             'services' => $this->serviceLabels(),
 
             'program_activity_details' => $this->program_activity_details,
+            'schedule' => $this->schedule ?? [],
+            'schedule_text' => $this->scheduleText(),
             'documentation_date' => $this->documentation_date?->format('Y-m-d'),
             'documentation_end_date' => $this->documentation_end_date?->format('Y-m-d'),
             'specific_shots' => $this->specific_shots,

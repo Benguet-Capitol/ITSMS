@@ -158,10 +158,8 @@
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
 
-    $documentationDate = $longDate($record->documentation_date);
-    if ($record->documentation_end_date && ! $record->documentation_end_date->equalTo($record->documentation_date)) {
-        $documentationDate .= ' to '.$longDate($record->documentation_end_date);
-    }
+    // e.g. "October 2 to 4 and 7, 2026"
+    $documentationDate = $record->scheduleText() ?? $longDate($record->documentation_date);
 
     $copies = [
         ['label' => 'PGO-IT/MIS FILE', 'feedback' => true],

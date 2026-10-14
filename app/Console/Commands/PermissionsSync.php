@@ -8,7 +8,15 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 /**
+ * Adds the permissions introduced after the 2026-09-03 production snapshot
+ * (reporting module + request modules) to an EXISTING database and grants
+ * them to their roles.
  *
+ * PermissionSeeder can't do this: it inserts fixed ids, which collide on a
+ * database that already has rows (and existing databases don't share the
+ * seeder's ids anyway). This command works by permission and role TITLE --
+ * gates check titles, never ids -- and is safe to re-run: existing
+ * permissions and grants are left untouched.
  */
 class PermissionsSync extends Command
 {

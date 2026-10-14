@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasDateSchedule;
 use Illuminate\Database\Eloquent\Model;
 
 class OtherItServiceRequest extends Model
 {
+    use HasDateSchedule;
+
     protected $fillable = [
         'control_number',
         'status',
@@ -76,4 +79,19 @@ class OtherItServiceRequest extends Model
         'service_ledwall_eoc' => 'boolean',
         'service_other_service' => 'boolean',
     ];
+
+    /**
+     * `activity_date_text` (what the printout and older screens show) is
+     * written from the schedule. Records from before the schedule existed
+     * keep their free text until a schedule is entered for them; clearing a
+     * schedule clears the text too.
+     */
+    protected function syncScheduleColumns(): void
+    {
+        if ($this->schedule) {
+            $this->activity_date_text = $this->scheduleText();
+        } elseif ($this->getOriginal('schedule')) {
+            $this->activity_date_text = null;
+        }
+    }
 }

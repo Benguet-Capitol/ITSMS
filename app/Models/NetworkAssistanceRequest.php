@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasDateSchedule;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
 class NetworkAssistanceRequest extends Model
 {
-    use HasYearlyControlNumber;
+    use HasDateSchedule, HasYearlyControlNumber;
 
     /** Same lifecycle as the other request modules -- the form has no approval chain. */
     public const STATUSES = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'];
@@ -92,5 +93,15 @@ class NetworkAssistanceRequest extends Model
     public function activityTimeHm(): ?string
     {
         return $this->activity_time ? substr($this->activity_time, 0, 5) : null;
+    }
+
+    /** First and last scheduled day; the end stays null for a single day. */
+    protected function syncScheduleColumns(): void
+    {
+        $start = $this->scheduleStart();
+        $end = $this->scheduleEnd();
+
+        $this->activity_date = $start;
+        $this->activity_end_date = $end !== $start ? $end : null;
     }
 }

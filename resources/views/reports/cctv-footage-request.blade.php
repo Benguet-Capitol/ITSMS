@@ -182,7 +182,10 @@
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
     $time12 = fn (?string $time) => $time ? \Carbon\Carbon::createFromFormat('H:i:s', strlen($time) === 5 ? "{$time}:00" : $time)->format('g:i A') : '';
 
-    $footageTime = trim($time12($record->footage_time_from).($record->footage_time_to ? ' - '.$time12($record->footage_time_to) : ''));
+    // With a window per date, the windows are printed beside each date.
+    $footageTime = $record->hasScheduleTimes()
+        ? 'As indicated per date'
+        : trim($time12($record->footage_time_from).($record->footage_time_to ? ' - '.$time12($record->footage_time_to) : ''));
     $selectedReasons = $record->reasons ?? [];
     $reasonRows = array_chunk($reasons, 4, true);
 
@@ -228,7 +231,7 @@
         </tr>
         <tr>
             <td class="label">Date of Incident:</td>
-            <td><span class="underline">{{ $longDate($record->date_of_incident) }}</span></td>
+            <td><span class="underline">{{ $record->scheduleText() ?? $longDate($record->date_of_incident) }}</span></td>
             <td class="label">Inclusive Time of Footage:</td>
             <td><span class="underline">{{ $footageTime }}</span></td>
         </tr>

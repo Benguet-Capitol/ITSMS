@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasDateSchedule;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
 class CctvFootageRequest extends Model
 {
-    use HasYearlyControlNumber;
+    use HasDateSchedule, HasYearlyControlNumber;
 
     public const STATUS_PENDING = 'pending';
 
@@ -151,5 +152,11 @@ class CctvFootageRequest extends Model
     public function canTransitionTo(string $status): bool
     {
         return $status === $this->status || in_array($status, $this->nextStatuses(), true);
+    }
+
+    /** `date_of_incident` keeps the earliest incident date, for sorting. */
+    protected function syncScheduleColumns(): void
+    {
+        $this->date_of_incident = $this->scheduleStart();
     }
 }

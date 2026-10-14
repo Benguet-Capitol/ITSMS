@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\DocumentationRequest;
+use App\Support\DateSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 
@@ -31,8 +32,7 @@ class StoreDocumentationRequest extends FormRequest
             'services' => ['array', 'min:1'],
 
             'program_activity_details' => ['required', 'string', 'max:5000'],
-            'documentation_date' => ['required', 'date'],
-            'documentation_end_date' => ['nullable', 'date', 'after_or_equal:documentation_date'],
+            ...DateSchedule::rules(),
             'specific_shots' => ['nullable', 'string', 'max:5000'],
             'additional_notes' => ['nullable', 'string', 'max:5000'],
         ];
@@ -41,7 +41,7 @@ class StoreDocumentationRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'documentation_end_date.after_or_equal' => 'The end date cannot be before the date of documentation.',
+            ...DateSchedule::messages('schedule', 'date of documentation'),
             'services.min' => 'Select at least one service: photo, video, or live feed.',
         ];
     }
@@ -67,5 +67,9 @@ class StoreDocumentationRequest extends FormRequest
         }
 
         $this->merge(['services' => $services]);
+
+        if ($this->has('schedule')) {
+            $this->merge(['schedule' => DateSchedule::normalize($this->input('schedule'))]);
+        }
     }
 }

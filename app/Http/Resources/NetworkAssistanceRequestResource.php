@@ -29,6 +29,8 @@ class NetworkAssistanceRequestResource extends JsonResource
             'services' => $this->serviceLabels(),
 
             'program_activity_details' => $this->program_activity_details,
+            'schedule' => $this->schedule ?? [],
+            'schedule_text' => $this->scheduleText(),
             'activity_date' => $this->activity_date?->format('Y-m-d'),
             'activity_end_date' => $this->activity_end_date?->format('Y-m-d'),
             'activity_time' => $this->activityTimeHm(),

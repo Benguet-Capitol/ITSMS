@@ -23,6 +23,8 @@ class CctvFootageRequestResource extends JsonResource
             'requester_address' => $this->requester_address,
             'requester_contact_number' => $this->requester_contact_number,
 
+            'schedule' => $this->schedule ?? [],
+            'schedule_text' => $this->scheduleText(),
             'date_of_incident' => $this->date_of_incident?->format('Y-m-d'),
             'footage_time_from' => $this->footage_time_from ? substr($this->footage_time_from, 0, 5) : null,
             'footage_time_to' => $this->footage_time_to ? substr($this->footage_time_to, 0, 5) : null,
