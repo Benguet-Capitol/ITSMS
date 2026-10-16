@@ -8,6 +8,7 @@ use App\Http\Resources\DtsUserRequestResource;
 use App\Models\DtsUserRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -33,7 +34,7 @@ class DtsUserRequestController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', Rule::in(DtsUserRequest::STATUSES)],
+            ...DtsUserRequest::listFilterRules(),
             'request_type' => ['nullable', 'string', Rule::in(array_keys(DtsUserRequest::REQUEST_TYPES))],
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
             'order' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
@@ -41,6 +42,7 @@ class DtsUserRequestController extends Controller
         ]);
 
         $query = DtsUserRequest::query()
+            ->with(['personnel', 'agency'])
             ->when($filters['search'] ?? null, function ($q, string $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('control_number', 'like', "%{$search}%")
@@ -48,11 +50,12 @@ class DtsUserRequestController extends Controller
                         ->orWhere('department', 'like', "%{$search}%")
                         ->orWhere('dts_username', 'like', "%{$search}%")
                         ->orWhere('requested_by', 'like', "%{$search}%")
-                        ->orWhere('assigned_personnel', 'like', "%{$search}%");
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
                 });
             })
             ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
-            ->when($filters['request_type'] ?? null, fn ($q, string $type) => $q->where('request_type', $type));
+            ->when($filters['request_type'] ?? null, fn ($q, string $type) => $q->where('request_type', $type))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile);
 
         if (! empty($filters['sort'])) {
             $query->orderBy($filters['sort'], $filters['order'] ?? 'asc');
@@ -79,23 +82,24 @@ class DtsUserRequestController extends Controller
 
         $record = DtsUserRequest::createWithControlNumber($request->dtsUserAttributes());
 
-        return new DtsUserRequestResource($record);
+        return new DtsUserRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(DtsUserRequest $dtsUserRequest)
     {
         Gate::authorize('requests.dts_user.view');
 
-        return new DtsUserRequestResource($dtsUserRequest);
+        return new DtsUserRequestResource($dtsUserRequest->load('personnel'));
     }
 
+    /** Form fields only -- status and personnel change through RequestWorkflowController. */
     public function update(UpdateDtsUserRequest $request, DtsUserRequest $dtsUserRequest)
     {
         Gate::authorize('requests.dts_user.update');
 
         $dtsUserRequest->update($request->dtsUserAttributes());
 
-        return new DtsUserRequestResource($dtsUserRequest);
+        return new DtsUserRequestResource($dtsUserRequest->load('personnel'));
     }
 
     public function destroy(DtsUserRequest $dtsUserRequest)
@@ -115,7 +119,7 @@ class DtsUserRequestController extends Controller
             // 8.5" x 13" portrait (612 x 936 pt) -- the official form stacks
             // the PGO-IT/MIS file copy above the client copy on one page.
             $pdf = Pdf::loadView('reports.dts-user-request', [
-                'requestRecord' => $dtsUserRequest,
+                'requestRecord' => $dtsUserRequest->load('personnel'),
                 'formCode' => config('dts_user.form_code'),
                 'requestTypes' => DtsUserRequest::REQUEST_TYPES,
             ])->setPaper([0, 0, 612, 936]);

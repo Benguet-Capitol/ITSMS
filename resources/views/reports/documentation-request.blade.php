@@ -158,6 +158,9 @@
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
 
+    // Workflow personnel and acceptance date (docs/adr/0002-request-workflow.md).
+    $assignedTo = $record->personnel->pluck('display_name')->join(', ');
+
     // e.g. "October 2 to 4 and 7, 2026"
     $documentationDate = $record->scheduleText() ?? $longDate($record->documentation_date);
 
@@ -237,8 +240,8 @@
                         <td class="label">For IT/MIS Office use:</td>
                         <td colspan="3">
                             <table class="office-use" style="width:100%">
-                                <tr><td>Assigned Personnel: <span class="underline">{{ $record->assigned_personnel }}</span></td></tr>
-                                <tr><td>Date Received: <span class="underline">{{ $longDate($record->date_received) }}</span></td></tr>
+                                <tr><td>Assigned Personnel: <span class="underline">{{ $assignedTo }}</span></td></tr>
+                                <tr><td>Date Received: <span class="underline">{{ $longDate($record->accepted_at) }}</span></td></tr>
                                 <tr><td>Action Taken: <span class="underline">{{ $record->action_taken }}</span></td></tr>
                             </table>
                         </td>

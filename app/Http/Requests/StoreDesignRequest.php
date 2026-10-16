@@ -24,6 +24,7 @@ class StoreDesignRequest extends FormRequest
         return [
             'date_of_request' => ['required', 'date'],
             'department_office' => ['required', 'string', 'max:255'],
+            ...DesignRequest::officeRules(),
             'date_needed' => ['required', 'date', 'after_or_equal:date_of_request'],
 
             'items' => ['required', 'array', 'min:1', 'max:'.count(DesignRequest::ITEMS)],
@@ -48,6 +49,7 @@ class StoreDesignRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...DesignRequest::officeMessages(),
             'date_needed.after_or_equal' => 'The date needed cannot be before the date of request.',
             'items.required' => 'Select at least one design/project.',
             'items.min' => 'Select at least one design/project.',

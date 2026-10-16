@@ -103,6 +103,14 @@ class PermissionRoleTableSeeder extends Seeder
             [133, 1], [134, 1], [135, 1], [136, 1], [137, 1],
             [133, 2], [134, 2], [135, 2], [136, 2], [137, 2],
             [133, 3], [134, 3], [135, 3], [136, 3], [137, 3],
+
+            // Request workflow -- everyone accepts; assign/complete/cancel/reopen are admin-only
+            [138, 1], [139, 1], [140, 1], [141, 1], [142, 1],
+            [138, 2], [139, 2], [140, 2], [141, 2], [142, 2],
+            [138, 3],
+
+            // Request forms pick the Department/Office from the HRIS office list
+            [95, 3],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);

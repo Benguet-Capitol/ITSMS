@@ -2,16 +2,29 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
 use App\Models\Concerns\HasDateSchedule;
+use App\Models\Concerns\HasRequesterOffice;
+use App\Models\Concerns\HasRequestWorkflow;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Status follows the shared request workflow (App\Enums\RequestStatus) and
+ * is set only by RequestWorkflowController -- the form has no approval
+ * chain of its own.
+ */
 class NetworkAssistanceRequest extends Model
 {
-    use HasDateSchedule, HasYearlyControlNumber;
+    use HasDateSchedule, HasRequesterOffice, HasRequestWorkflow, HasYearlyControlNumber;
 
-    /** Same lifecycle as the other request modules -- the form has no approval chain. */
-    public const STATUSES = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'];
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requestor_name';
+
+    /** Department/Office text column (HasRequesterOffice). */
+    public const OFFICE_FIELD = 'department_office';
+
+    public const ALLOWS_OTHER_AGENCY = true;
 
     /** Service checkbox column => label printed on form ICT-15. */
     public const SERVICES = [
@@ -23,7 +36,6 @@ class NetworkAssistanceRequest extends Model
 
     protected $fillable = [
         'control_number',
-        'status',
         'date_of_request',
         'department_office',
         'requestor_name',
@@ -37,16 +49,13 @@ class NetworkAssistanceRequest extends Model
         'activity_end_date',
         'activity_time',
         'venue',
-        'assigned_personnel',
-        'date_received',
         'action_taken',
         'feedback_rating',
-        'feedback_name',
         'feedback_date',
     ];
 
     protected $attributes = [
-        'status' => 'pending',
+        'status' => RequestStatus::Pending->value,
         'service_wifi_installation' => false,
         'service_ethernet_wiring' => false,
         'service_network_planning' => false,
@@ -57,7 +66,6 @@ class NetworkAssistanceRequest extends Model
         'date_of_request' => 'date:Y-m-d',
         'activity_date' => 'date:Y-m-d',
         'activity_end_date' => 'date:Y-m-d',
-        'date_received' => 'date:Y-m-d',
         'feedback_date' => 'date:Y-m-d',
         'service_wifi_installation' => 'boolean',
         'service_ethernet_wiring' => 'boolean',

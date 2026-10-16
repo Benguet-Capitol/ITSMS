@@ -2,15 +2,28 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
+use App\Models\Concerns\HasRequesterOffice;
+use App\Models\Concerns\HasRequestWorkflow;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Status follows the shared request workflow (App\Enums\RequestStatus) and
+ * is set only by RequestWorkflowController -- the form has no approval
+ * chain of its own.
+ */
 class DesignRequest extends Model
 {
-    use HasYearlyControlNumber;
+    use HasRequesterOffice, HasRequestWorkflow, HasYearlyControlNumber;
 
-    /** Same lifecycle as the other request modules -- the form has no approval chain. */
-    public const STATUSES = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'];
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requester_name';
+
+    /** Department/Office text column (HasRequesterOffice). */
+    public const OFFICE_FIELD = 'department_office';
+
+    public const ALLOWS_OTHER_AGENCY = true;
 
     /** Item value => label printed on form ICT-10, in the form's column order. */
     public const ITEMS = [
@@ -43,7 +56,6 @@ class DesignRequest extends Model
 
     protected $fillable = [
         'control_number',
-        'status',
         'date_of_request',
         'department_office',
         'date_needed',
@@ -54,24 +66,20 @@ class DesignRequest extends Model
         'requester_name',
         'requester_position',
         'requester_email',
-        'assigned_personnel',
-        'date_received',
         'date_released',
         'received_by',
         'remarks',
         'feedback_rating',
-        'feedback_name',
         'feedback_date',
     ];
 
     protected $attributes = [
-        'status' => 'pending',
+        'status' => RequestStatus::Pending->value,
     ];
 
     protected $casts = [
         'date_of_request' => 'date:Y-m-d',
         'date_needed' => 'date:Y-m-d',
-        'date_received' => 'date:Y-m-d',
         'date_released' => 'date:Y-m-d',
         'feedback_date' => 'date:Y-m-d',
         'items' => 'array',

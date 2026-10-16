@@ -24,6 +24,7 @@ class StoreDocumentationRequest extends FormRequest
         return [
             'date_of_request' => ['required', 'date'],
             'department_office' => ['required', 'string', 'max:255'],
+            ...DocumentationRequest::officeRules(),
             'requestor_name' => ['required', 'string', 'max:255'],
 
             'service_photo' => ['boolean'],
@@ -41,6 +42,7 @@ class StoreDocumentationRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...DocumentationRequest::officeMessages(),
             ...DateSchedule::messages('schedule', 'date of documentation'),
             'services.min' => 'Select at least one service: photo, video, or live feed.',
         ];

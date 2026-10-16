@@ -25,6 +25,7 @@ class StoreNetworkAssistanceRequest extends FormRequest
         return [
             'date_of_request' => ['required', 'date'],
             'department_office' => ['required', 'string', 'max:255'],
+            ...NetworkAssistanceRequest::officeRules(),
             'requestor_name' => ['required', 'string', 'max:255'],
 
             'service_wifi_installation' => ['boolean'],
@@ -50,6 +51,7 @@ class StoreNetworkAssistanceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...NetworkAssistanceRequest::officeMessages(),
             ...DateSchedule::messages('schedule', 'date of activity'),
             'activity_time.prohibited' => DateSchedule::SHARED_TIME_MESSAGE,
             'services.min' => 'Select at least one network service.',

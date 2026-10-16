@@ -30,6 +30,7 @@ class StoreDtsUserRequest extends FormRequest
 
             'full_name' => ['required', 'string', 'max:255'],
             'department' => ['required', 'string', 'max:255'],
+            ...DtsUserRequest::officeRules(),
             'position' => ['nullable', 'string', 'max:255'],
             'dts_username' => ['required', 'string', 'min:3', 'max:50', 'regex:/^[A-Za-z0-9._-]+$/'],
 
@@ -40,6 +41,7 @@ class StoreDtsUserRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...DtsUserRequest::officeMessages(),
             'update_details.required_if' => 'Please state which user details should be updated.',
             'dts_username.regex' => 'The DTS username may only contain letters, numbers, dots, underscores and hyphens.',
             'requested_by.required' => 'The requesting department head is required.',

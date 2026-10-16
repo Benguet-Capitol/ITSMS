@@ -2,30 +2,42 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
+use App\Models\Concerns\HasRequesterOffice;
+use App\Models\Concerns\HasRequestWorkflow;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Request for Change or Modification of Information System. The control
  * number is the form's "Change Request No.".
+ *
+ * Status follows the shared request workflow (App\Enums\RequestStatus),
+ * set only by RequestWorkflowController. The development step is a
+ * separate `stage` (see STAGES).
  */
 class IsChangeRequest extends Model
 {
-    use HasYearlyControlNumber;
+    use HasRequesterOffice, HasRequestWorkflow, HasYearlyControlNumber;
+
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requested_by';
+
+    /** Department/Office text column (HasRequesterOffice). */
+    public const OFFICE_FIELD = 'department_office';
+
+    public const ALLOWS_OTHER_AGENCY = false;
 
     /**
-     * Software-change lifecycle matching the form's review, development,
-     * end-user testing and sign-off sections. Any status may be set
-     * directly -- the form defines no enforced order.
+     * Development steps matching the form's review, development and
+     * end-user testing sections. Any step may be set directly -- the form
+     * defines no enforced order -- but only while the request is in
+     * progress (UpdateIsChangeRequest).
      */
-    public const STATUSES = [
-        'pending' => 'Pending',
+    public const STAGES = [
         'reviewed' => 'Reviewed',
         'in_development' => 'In Development',
         'testing' => 'For Testing',
-        'completed' => 'Completed',
-        'on_hold' => 'On Hold',
-        'cancelled' => 'Cancelled',
     ];
 
     public const REQUEST_TYPES = [
@@ -44,7 +56,7 @@ class IsChangeRequest extends Model
 
     protected $fillable = [
         'control_number',
-        'status',
+        'stage',
         'date_of_request',
         'department_office',
         'information_system',
@@ -58,34 +70,35 @@ class IsChangeRequest extends Model
         'requested_by',
         'reviewed_by',
         'reviewed_date',
-        'programmer_name',
-        'date_received',
         'testing_schedule',
         'deployed_by',
         'approved_by',
         'approved_date',
         'remarks',
         'feedback_rating',
-        'feedback_name',
         'feedback_date',
         'accepted_by',
         'accepted_date',
     ];
 
     protected $attributes = [
-        'status' => 'pending',
+        'status' => RequestStatus::Pending->value,
     ];
 
     protected $casts = [
         'date_of_request' => 'date:Y-m-d',
         'date_required' => 'date:Y-m-d',
         'reviewed_date' => 'date:Y-m-d',
-        'date_received' => 'date:Y-m-d',
         'approved_date' => 'date:Y-m-d',
         'feedback_date' => 'date:Y-m-d',
         'accepted_date' => 'date:Y-m-d',
         'feedback_rating' => 'integer',
     ];
+
+    public function stageLabel(): ?string
+    {
+        return $this->stage ? (self::STAGES[$this->stage] ?? $this->stage) : null;
+    }
 
     /** "Others: <specification>" for the others type, the plain label otherwise. */
     public function requestTypeLabel(): string

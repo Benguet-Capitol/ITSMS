@@ -8,37 +8,58 @@ use App\Http\Resources\OtherItServiceRequestResource;
 use App\Models\OtherItServiceRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class OtherItServiceRequestController extends Controller
 {
+    /** Columns the list may be sorted by -- never pass the raw param to orderBy. */
+    private const SORTABLE = [
+        'control_number',
+        'status',
+        'requestor_name',
+        'department_office',
+        'date_of_request',
+        'activity_venue',
+        'created_at',
+    ];
+
     public function index(Request $request)
     {
         Gate::authorize('requests.other_it_services.view');
 
-        $query = OtherItServiceRequest::query();
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            ...OtherItServiceRequest::listFilterRules(),
+            'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
+            'order' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
+        $query = OtherItServiceRequest::query()
+            ->with(['personnel', 'agency'])
+            ->when($filters['search'] ?? null, function ($q, string $search) {
+                $q->where(function ($q) use ($search) {
+                    $q->where('control_number', 'LIKE', "%{$search}%")
+                        ->orWhere('requestor_name', 'LIKE', "%{$search}%")
+                        ->orWhere('department_office', 'LIKE', "%{$search}%")
+                        ->orWhere('program_activity_details', 'LIKE', "%{$search}%")
+                        ->orWhere('activity_venue', 'LIKE', "%{$search}%")
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
+                });
+            })
+            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile);
 
-            $query->where(function ($q) use ($search) {
-                $q->where('control_number', 'LIKE', "%{$search}%")
-                    ->orWhere('requestor_name', 'LIKE', "%{$search}%")
-                    ->orWhere('department_office', 'LIKE', "%{$search}%")
-                    ->orWhere('program_activity_details', 'LIKE', "%{$search}%")
-                    ->orWhere('activity_venue', 'LIKE', "%{$search}%");
-            });
-        }
-
-        if ($request->has('sort')) {
-            $order = $request->input('order', 'asc');
-            $query->orderBy($request->sort, $order);
+        if (! empty($filters['sort'])) {
+            $query->orderBy($filters['sort'], $filters['order'] ?? 'asc');
         } else {
             $query->latest();
         }
 
-        $requests = $query->paginate($request->input('per_page', 5))->appends($request->query());
+        $requests = $query->paginate($filters['per_page'] ?? 5)->appends($request->query());
 
         return response()->json([
             'data' => OtherItServiceRequestResource::collection($requests),
@@ -57,18 +78,19 @@ class OtherItServiceRequestController extends Controller
 
         $data = $request->validated();
 
-        $record = OtherItServiceRequest::create($data);
+        $record = OtherItServiceRequest::createWithControlNumber($data);
 
-        return new OtherItServiceRequestResource($record);
+        return new OtherItServiceRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(OtherItServiceRequest $otherItServiceRequest)
     {
         Gate::authorize('requests.other_it_services.view');
 
-        return new OtherItServiceRequestResource($otherItServiceRequest);
+        return new OtherItServiceRequestResource($otherItServiceRequest->load('personnel'));
     }
 
+    /** Form fields only -- status and personnel change through RequestWorkflowController. */
     public function update(UpdateOtherItServiceRequest $request, OtherItServiceRequest $otherItServiceRequest)
     {
         Gate::authorize('requests.other_it_services.update');
@@ -77,7 +99,7 @@ class OtherItServiceRequestController extends Controller
 
         $otherItServiceRequest->update($data);
 
-        return new OtherItServiceRequestResource($otherItServiceRequest);
+        return new OtherItServiceRequestResource($otherItServiceRequest->load('personnel'));
     }
 
     public function destroy(OtherItServiceRequest $otherItServiceRequest)
@@ -95,7 +117,7 @@ class OtherItServiceRequestController extends Controller
 
         try {
             $pdf = Pdf::loadView('reports.other-it-service-request', [
-                'requestRecord' => $otherItServiceRequest,
+                'requestRecord' => $otherItServiceRequest->load('personnel'),
                 'generatedAt' => now(),
             ])->setPaper('letter', 'portrait');
 

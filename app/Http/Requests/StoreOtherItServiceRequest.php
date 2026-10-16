@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\OtherItServiceRequest;
 use App\Support\DateSchedule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +26,7 @@ class StoreOtherItServiceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...OtherItServiceRequest::officeMessages(),
             ...DateSchedule::messages('schedule', 'date of activity'),
             'activity_time.prohibited' => DateSchedule::SHARED_TIME_MESSAGE,
         ];
@@ -46,10 +48,9 @@ class StoreOtherItServiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'control_number' => ['nullable', 'string', 'max:255', 'unique:other_it_service_requests,control_number'],
-            'status' => ['required', 'string', Rule::in(['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'])],
             'date_of_request' => ['nullable', 'date'],
             'department_office' => ['nullable', 'string', 'max:255'],
+            ...OtherItServiceRequest::officeRules(),
             'requestor_name' => ['nullable', 'string', 'max:255'],
 
             'service_printing' => ['nullable', 'boolean'],
@@ -78,12 +79,9 @@ class StoreOtherItServiceRequest extends FormRequest
             'activity_time' => ['nullable', 'string', 'max:50', DateSchedule::sharedTimeRule($this->input('schedule'))],
             'activity_venue' => ['nullable', 'string', 'max:255'],
 
-            'assigned_personnel' => ['nullable', 'string', 'max:255'],
-            'date_received' => ['nullable', 'date'],
             'action_taken' => ['nullable', 'string'],
 
             'feedback_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
-            'feedback_name' => ['nullable', 'string', 'max:255'],
             'feedback_date' => ['nullable', 'date'],
         ];
     }

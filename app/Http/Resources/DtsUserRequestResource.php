@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Resources\Concerns\HasWorkflowFields;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class DtsUserRequestResource extends JsonResource
 {
+    use HasWorkflowFields;
+
     /**
      * @return array<string, mixed>
      */
@@ -15,7 +18,7 @@ class DtsUserRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'control_number' => $this->control_number,
-            'status' => $this->status,
+            ...$this->workflowFields($request),
 
             'date_of_request' => $this->date_of_request?->format('Y-m-d'),
             'request_type' => $this->request_type,
@@ -24,12 +27,12 @@ class DtsUserRequestResource extends JsonResource
 
             'full_name' => $this->full_name,
             'department' => $this->department,
+            ...$this->officeResourceFields(),
             'position' => $this->position,
             'dts_username' => $this->dts_username,
 
             'requested_by' => $this->requested_by,
 
-            'assigned_personnel' => $this->assigned_personnel,
             'created_by' => $this->created_by,
             'date_created' => $this->date_created?->format('Y-m-d'),
 

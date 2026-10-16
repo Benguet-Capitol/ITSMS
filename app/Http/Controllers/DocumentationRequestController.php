@@ -8,6 +8,7 @@ use App\Http\Resources\DocumentationRequestResource;
 use App\Models\DocumentationRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -31,23 +32,25 @@ class DocumentationRequestController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', Rule::in(DocumentationRequest::STATUSES)],
+            ...DocumentationRequest::listFilterRules(),
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
             'order' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = DocumentationRequest::query()
+            ->with(['personnel', 'agency'])
             ->when($filters['search'] ?? null, function ($q, string $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('control_number', 'like', "%{$search}%")
                         ->orWhere('requestor_name', 'like', "%{$search}%")
                         ->orWhere('department_office', 'like', "%{$search}%")
                         ->orWhere('program_activity_details', 'like', "%{$search}%")
-                        ->orWhere('assigned_personnel', 'like', "%{$search}%");
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
                 });
             })
-            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status));
+            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile);
 
         if (! empty($filters['sort'])) {
             $query->orderBy($filters['sort'], $filters['order'] ?? 'asc');
@@ -74,23 +77,24 @@ class DocumentationRequestController extends Controller
 
         $record = DocumentationRequest::createWithControlNumber($request->validated());
 
-        return new DocumentationRequestResource($record);
+        return new DocumentationRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(DocumentationRequest $documentationRequest)
     {
         Gate::authorize('requests.documentation.view');
 
-        return new DocumentationRequestResource($documentationRequest);
+        return new DocumentationRequestResource($documentationRequest->load('personnel'));
     }
 
+    /** Form fields only -- status and personnel change through RequestWorkflowController. */
     public function update(UpdateDocumentationRequest $request, DocumentationRequest $documentationRequest)
     {
         Gate::authorize('requests.documentation.update');
 
         $documentationRequest->update($request->validated());
 
-        return new DocumentationRequestResource($documentationRequest);
+        return new DocumentationRequestResource($documentationRequest->load('personnel'));
     }
 
     public function destroy(DocumentationRequest $documentationRequest)
@@ -110,7 +114,7 @@ class DocumentationRequestController extends Controller
             // 13" x 8.5" long bond, landscape (936 x 612 pt) -- the official
             // ICT-11 form prints the PGO-IT/MIS and client copies side by side.
             $pdf = Pdf::loadView('reports.documentation-request', [
-                'requestRecord' => $documentationRequest,
+                'requestRecord' => $documentationRequest->load('personnel'),
                 'formCode' => config('documentation.form_code'),
                 'services' => DocumentationRequest::SERVICES,
             ])->setPaper([0, 0, 936, 612]);

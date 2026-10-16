@@ -2,58 +2,26 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
 use App\Models\Concerns\HasDateSchedule;
+use App\Models\Concerns\HasRequestWorkflow;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * The DPO's recommendation and the Provincial Administrator's approval are
+ * signed on the paper form before a request is entered, so ITSMS has no
+ * approval chain of its own: status follows the shared request workflow
+ * (App\Enums\RequestStatus), set only by RequestWorkflowController. The IT
+ * personnel section (extraction and release) must be filled before the
+ * request is marked for completion.
+ */
 class CctvFootageRequest extends Model
 {
-    use HasDateSchedule, HasYearlyControlNumber;
+    use HasDateSchedule, HasRequestWorkflow, HasYearlyControlNumber;
 
-    public const STATUS_PENDING = 'pending';
-
-    public const STATUS_RECOMMENDED = 'recommended';
-
-    public const STATUS_APPROVED = 'approved';
-
-    public const STATUS_DENIED = 'denied';
-
-    public const STATUS_RELEASED = 'released';
-
-    public const STATUS_CANCELLED = 'cancelled';
-
-    public const STATUSES = [
-        self::STATUS_PENDING,
-        self::STATUS_RECOMMENDED,
-        self::STATUS_APPROVED,
-        self::STATUS_DENIED,
-        self::STATUS_RELEASED,
-        self::STATUS_CANCELLED,
-    ];
-
-    /**
-     * Mirrors the form's signature flow: the DPO recommends, the Provincial
-     * Administrator approves (or the request is denied at either step), and
-     * IT releases/plays back the footage. Denied, released and cancelled
-     * are final.
-     */
-    public const TRANSITIONS = [
-        self::STATUS_PENDING => [self::STATUS_RECOMMENDED, self::STATUS_DENIED, self::STATUS_CANCELLED],
-        self::STATUS_RECOMMENDED => [self::STATUS_APPROVED, self::STATUS_DENIED, self::STATUS_CANCELLED],
-        self::STATUS_APPROVED => [self::STATUS_RELEASED, self::STATUS_CANCELLED],
-        self::STATUS_DENIED => [],
-        self::STATUS_RELEASED => [],
-        self::STATUS_CANCELLED => [],
-    ];
-
-    /** Status => the timestamp column stamped when a request enters it. */
-    public const STATUS_TIMESTAMPS = [
-        self::STATUS_RECOMMENDED => 'recommended_at',
-        self::STATUS_APPROVED => 'approved_at',
-        self::STATUS_DENIED => 'denied_at',
-        self::STATUS_RELEASED => 'released_at',
-        self::STATUS_CANCELLED => 'cancelled_at',
-    ];
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requester_name';
 
     public const CAPACITIES = [
         'person_in_footage',
@@ -89,7 +57,6 @@ class CctvFootageRequest extends Model
 
     protected $fillable = [
         'control_number',
-        'status',
         'date_of_request',
         'requester_name',
         'requester_address',
@@ -105,7 +72,6 @@ class CctvFootageRequest extends Model
         'reason_others',
         'description',
         'documents_presented',
-        'denial_reason',
         'extracted_at',
         'camera_name',
         'nvr_number',
@@ -113,10 +79,12 @@ class CctvFootageRequest extends Model
         'extracted_by',
         'released_by',
         'received_by',
+        'feedback_rating',
+        'feedback_date',
     ];
 
     protected $attributes = [
-        'status' => self::STATUS_PENDING,
+        'status' => RequestStatus::Pending->value,
     ];
 
     protected $casts = [
@@ -124,34 +92,35 @@ class CctvFootageRequest extends Model
         'date_of_incident' => 'date:Y-m-d',
         'reasons' => 'array',
         'documents_presented' => 'array',
-        'recommended_at' => 'datetime',
-        'approved_at' => 'datetime',
-        'denied_at' => 'datetime',
-        'released_at' => 'datetime',
-        'cancelled_at' => 'datetime',
         'extracted_at' => 'datetime:Y-m-d H:i',
+        'feedback_date' => 'date:Y-m-d',
+        'feedback_rating' => 'integer',
     ];
 
-    protected static function booted(): void
+    /**
+     * The "Details to be completed by IT personnel" section -- what used to
+     * be required to release footage -- is required before marking the
+     * request for completion. File names only apply to a copy.
+     */
+    public function finishRequirements(): array
     {
-        static::saving(function (CctvFootageRequest $request) {
-            $column = self::STATUS_TIMESTAMPS[$request->status] ?? null;
+        $required = [
+            'extracted_at' => 'The date and time of playback/extraction is required before marking this for completion.',
+            'camera_name' => 'The camera name is required before marking this for completion.',
+            'extracted_by' => 'The IT personnel who extracted the footage is required before marking this for completion.',
+            'released_by' => 'The name of the person who released the footage is required before marking this for completion.',
+            'received_by' => 'The name of the person who viewed/received the footage is required before marking this for completion.',
+        ];
 
-            if ($column && $request->isDirty('status') && ! $request->{$column}) {
-                $request->{$column} = now();
-            }
-        });
-    }
+        if ($this->purpose === 'copy') {
+            $required['file_names'] = 'The file name/s are required before marking a copy for completion.';
+        }
 
-    /** @return list<string> */
-    public function nextStatuses(): array
-    {
-        return self::TRANSITIONS[$this->status] ?? [];
-    }
-
-    public function canTransitionTo(string $status): bool
-    {
-        return $status === $this->status || in_array($status, $this->nextStatuses(), true);
+        return array_filter(
+            $required,
+            fn (string $message, string $field) => blank($this->{$field}),
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     /** `date_of_incident` keeps the earliest incident date, for sorting. */

@@ -2,14 +2,13 @@
 
 namespace App\Http\Requests;
 
-use App\Models\DtsUserRequest;
-use Illuminate\Validation\Rule;
-
 class UpdateDtsUserRequest extends StoreDtsUserRequest
 {
     /**
-     * Adds the status, "For PGO-IT/MIS Use" and requestor's feedback
-     * sections on top of the create fields.
+     * Adds "Created by" / "Date Created" from the "For PGO-IT/MIS Use"
+     * section and the requestor's feedback on top of the create fields.
+     * Status and assigned personnel come from the workflow
+     * (RequestWorkflowController), so they aren't editable here.
      *
      * @return array<string, array<mixed>>
      */
@@ -18,14 +17,10 @@ class UpdateDtsUserRequest extends StoreDtsUserRequest
         return [
             ...parent::rules(),
 
-            'status' => ['required', 'string', Rule::in(DtsUserRequest::STATUSES)],
-
-            'assigned_personnel' => ['nullable', 'string', 'max:255'],
             'created_by' => ['nullable', 'string', 'max:255'],
             'date_created' => ['nullable', 'date'],
 
             'feedback_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
-            'feedback_name' => ['nullable', 'string', 'max:255'],
             'feedback_date' => ['nullable', 'date'],
         ];
     }

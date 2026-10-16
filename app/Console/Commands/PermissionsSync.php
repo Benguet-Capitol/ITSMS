@@ -24,7 +24,7 @@ class PermissionsSync extends Command
 
     protected $description = 'Add the reporting and request-module permissions to an existing database and grant them to their roles (idempotent)';
 
-    /** Roles every permission below is granted to (mirrors PermissionRoleTableSeeder). */
+    /** Roles every PERMISSIONS entry is granted to (mirrors PermissionRoleTableSeeder). */
     private const ROLES = ['Admin', 'It Admin Staff', 'It Technical'];
 
     /** Permissions added after the production snapshot (mirrors PermissionSeeder ids 106+). */
@@ -49,6 +49,21 @@ class PermissionsSync extends Command
 
         'requests.is_change.view', 'requests.is_change.create', 'requests.is_change.update',
         'requests.is_change.print', 'requests.is_change.delete',
+
+        'requests.accept',
+
+        // Request forms pick the Department/Office from the HRIS office
+        // list; Admin and It Admin Staff already had this, It Technical
+        // (who also files requests) did not.
+        'offices.search',
+    ];
+
+    /** Admin-only roles (mirrors PermissionRoleTableSeeder's request workflow block). */
+    private const ADMIN_ROLES = ['Admin', 'It Admin Staff'];
+
+    /** Request workflow permissions granted to ADMIN_ROLES only (docs/adr/0002-request-workflow.md). */
+    private const ADMIN_PERMISSIONS = [
+        'requests.assign', 'requests.complete', 'requests.cancel', 'requests.reopen',
     ];
 
     public function handle(): int
@@ -65,8 +80,14 @@ class PermissionsSync extends Command
         $createdPermissions = 0;
         $createdGrants = 0;
 
-        $apply = function () use ($roles, $dryRun, &$createdPermissions, &$createdGrants) {
-            foreach (self::PERMISSIONS as $title) {
+        $plan = [
+            ...array_fill_keys(self::PERMISSIONS, $roles),
+            // toBase(): Eloquent's only() filters by model key, not by the title keys.
+            ...array_fill_keys(self::ADMIN_PERMISSIONS, $roles->toBase()->only(self::ADMIN_ROLES)),
+        ];
+
+        $apply = function () use ($plan, $dryRun, &$createdPermissions, &$createdGrants) {
+            foreach ($plan as $title => $roles) {
                 $permission = Permission::query()->where('title', $title)->first();
 
                 if (! $permission) {

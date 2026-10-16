@@ -175,8 +175,10 @@
     $dateReq      = $requestRecord->date_of_request
                         ? \Carbon\Carbon::parse($requestRecord->date_of_request)->format('F d, Y')
                         : '';
-    $dateReceived = $requestRecord->date_received
-                        ? \Carbon\Carbon::parse($requestRecord->date_received)->format('F d, Y')
+    // Workflow personnel and acceptance date (docs/adr/0002-request-workflow.md).
+    $assignedTo   = $requestRecord->personnel->pluck('display_name')->join(', ');
+    $dateReceived = $requestRecord->accepted_at
+                        ? \Carbon\Carbon::parse($requestRecord->accepted_at)->format('F d, Y')
                         : '';
     $feedbackDate = $requestRecord->feedback_date
                         ? \Carbon\Carbon::parse($requestRecord->feedback_date)->format('F d, Y')
@@ -286,7 +288,7 @@
         <tr>
             <td class="label" rowspan="3" style="vertical-align:top; padding-top:2px;">For IT/MIS Office use:</td>
             <td class="label">Assigned Personnel:</td>
-            <td><span class="underline">{{ $requestRecord->assigned_personnel }}</span></td>
+            <td><span class="underline">{{ $assignedTo }}</span></td>
         </tr>
         <tr>
             <td class="label">Date Received:</td>
@@ -438,7 +440,7 @@
         <tr>
             <td class="label" rowspan="3" style="vertical-align:top; padding-top:2px;">For IT/MIS Office use:</td>
             <td class="label">Assigned Personnel:</td>
-            <td><span class="underline">{{ $requestRecord->assigned_personnel }}</span></td>
+            <td><span class="underline">{{ $assignedTo }}</span></td>
         </tr>
         <tr>
             <td class="label">Date Received:</td>

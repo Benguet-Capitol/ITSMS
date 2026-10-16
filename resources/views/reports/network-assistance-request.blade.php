@@ -148,6 +148,9 @@
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
 
+    // Workflow personnel and acceptance date (docs/adr/0002-request-workflow.md).
+    $assignedTo = $record->personnel->pluck('display_name')->join(', ');
+
     // e.g. "October 2 to 4 and 7, 2026, 8:00 AM", or with a time per date
     // "October 2, 2026 (8:00 AM); October 5, 2026 (1:00 PM)" -- the shared
     // time is empty then.
@@ -249,11 +252,11 @@
             <tr>
                 <td class="label" rowspan="3" style="vertical-align:top">For IT/MIS Office use:</td>
                 <td class="label">Assigned Personnel:</td>
-                <td><span class="underline">{{ $record->assigned_personnel }}</span></td>
+                <td><span class="underline">{{ $assignedTo }}</span></td>
             </tr>
             <tr>
                 <td class="label">Date Received:</td>
-                <td><span class="underline">{{ $longDate($record->date_received) }}</span></td>
+                <td><span class="underline">{{ $longDate($record->accepted_at) }}</span></td>
             </tr>
             <tr>
                 <td class="label">{{ $copy['actionLabel'] }}</td>

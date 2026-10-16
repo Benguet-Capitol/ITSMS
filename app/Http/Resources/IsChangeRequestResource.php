@@ -2,12 +2,15 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Resources\Concerns\HasWorkflowFields;
 use App\Models\IsChangeRequest;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class IsChangeRequestResource extends JsonResource
 {
+    use HasWorkflowFields;
+
     /**
      * @return array<string, mixed>
      */
@@ -16,11 +19,13 @@ class IsChangeRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'control_number' => $this->control_number,
-            'status' => $this->status,
-            'status_label' => IsChangeRequest::STATUSES[$this->status] ?? $this->status,
+            ...$this->workflowFields($request),
+            'stage' => $this->stage,
+            'stage_label' => $this->stageLabel(),
 
             'date_of_request' => $this->date_of_request?->format('Y-m-d'),
             'department_office' => $this->department_office,
+            ...$this->officeResourceFields(),
             'information_system' => $this->information_system,
 
             'request_type' => $this->request_type,
@@ -38,9 +43,6 @@ class IsChangeRequestResource extends JsonResource
 
             'reviewed_by' => $this->reviewed_by,
             'reviewed_date' => $this->reviewed_date?->format('Y-m-d'),
-
-            'programmer_name' => $this->programmer_name,
-            'date_received' => $this->date_received?->format('Y-m-d'),
 
             'testing_schedule' => $this->testing_schedule,
             'deployed_by' => $this->deployed_by,

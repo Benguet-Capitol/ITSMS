@@ -2,19 +2,31 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
+use App\Models\Concerns\HasRequesterOffice;
+use App\Models\Concerns\HasRequestWorkflow;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
 /**
  * Request for New DTS User / Update of User Details. There is intentionally
  * no password attribute -- see the create_dts_user_requests migration.
+ *
+ * Status follows the shared request workflow (App\Enums\RequestStatus) and
+ * is set only by RequestWorkflowController -- the form has no approval
+ * chain of its own.
  */
 class DtsUserRequest extends Model
 {
-    use HasYearlyControlNumber;
+    use HasRequesterOffice, HasRequestWorkflow, HasYearlyControlNumber;
 
-    /** Same lifecycle as the other request modules -- the form has no approval chain. */
-    public const STATUSES = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'];
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requested_by';
+
+    /** Department/Office text column (HasRequesterOffice). */
+    public const OFFICE_FIELD = 'department';
+
+    public const ALLOWS_OTHER_AGENCY = true;
 
     public const REQUEST_TYPES = [
         'new' => 'New DTS User',
@@ -23,7 +35,6 @@ class DtsUserRequest extends Model
 
     protected $fillable = [
         'control_number',
-        'status',
         'date_of_request',
         'request_type',
         'update_details',
@@ -32,16 +43,14 @@ class DtsUserRequest extends Model
         'position',
         'dts_username',
         'requested_by',
-        'assigned_personnel',
         'created_by',
         'date_created',
         'feedback_rating',
-        'feedback_name',
         'feedback_date',
     ];
 
     protected $attributes = [
-        'status' => 'pending',
+        'status' => RequestStatus::Pending->value,
     ];
 
     protected $casts = [

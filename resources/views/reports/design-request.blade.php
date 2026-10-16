@@ -187,6 +187,9 @@
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
 
+    // Workflow personnel and acceptance date (docs/adr/0002-request-workflow.md).
+    $assignedTo = $record->personnel->pluck('display_name')->join(', ');
+
     $requested = $record->itemsByType();
     $formats = $record->file_formats ?? [];
     $mediaProvided = $record->media_provided ?? [];
@@ -313,8 +316,8 @@
                 <table class="office">
                     <tr>
                         <td style="width:14%"><strong>For IT/MIS Office Use:</strong></td>
-                        <td style="width:32%"><strong>Assigned to:</strong>{{ $record->assigned_personnel }}</td>
-                        <td style="width:26%"><strong>Date Received:</strong>{{ $longDate($record->date_received) }}</td>
+                        <td style="width:32%"><strong>Assigned to:</strong>{{ $assignedTo }}</td>
+                        <td style="width:26%"><strong>Date Received:</strong>{{ $longDate($record->accepted_at) }}</td>
                         <td><strong>Signature:</strong></td>
                     </tr>
                     <tr>

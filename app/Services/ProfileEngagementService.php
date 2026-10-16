@@ -2,26 +2,55 @@
 
 namespace App\Services;
 
+use App\Enums\RequestStatus;
 use App\Enums\TicketStatus;
 use App\Models\Profile;
+use App\Support\RequestTypes;
+use Illuminate\Database\Eloquent\Model;
 
 class ProfileEngagementService
 {
     /**
-     * Sync a profile's engagement (READY/BUSY) based on their active tickets.
+     * Sync a profile's engagement (READY/BUSY) based on their active
+     * tickets and active requests (in progress or on hold).
      */
     public static function sync(Profile $profile): void
     {
-        $hasActiveTickets = $profile->ticketPersonnel()
+        $isBusy = $profile->ticketPersonnel()
             ->whereIn('request_status', [TicketStatus::Accepted, TicketStatus::Reopened])
             ->whereNotIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled])
-            ->exists();
+            ->exists()
+            || self::hasActiveRequests($profile);
 
         $profile->update([
-            'engagement' => $hasActiveTickets
+            'engagement' => $isBusy
                 ? Profile::ENGAGEMENT_BUSY
                 : Profile::ENGAGEMENT_READY,
         ]);
+    }
+
+    /** Sync everyone on a request (any HasRequestWorkflow model). */
+    public static function syncRequest(Model $request): void
+    {
+        foreach ($request->personnel()->get() as $profile) {
+            self::sync($profile);
+        }
+    }
+
+    private static function hasActiveRequests(Profile $profile): bool
+    {
+        foreach (RequestTypes::morphMap() as $model) {
+            $active = $model::query()
+                ->assignedTo($profile->id)
+                ->whereIn('status', RequestStatus::active())
+                ->exists();
+
+            if ($active) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

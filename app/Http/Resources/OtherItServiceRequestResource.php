@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Resources\Concerns\HasWorkflowFields;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class OtherItServiceRequestResource extends JsonResource
 {
+    use HasWorkflowFields;
+
     /**
      * Transform the resource into an array.
      *
@@ -17,10 +20,11 @@ class OtherItServiceRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'control_number' => $this->control_number,
-            'status' => $this->status,
+            ...$this->workflowFields($request),
 
             'date_of_request' => $this->date_of_request,
             'department_office' => $this->department_office,
+            ...$this->officeResourceFields(),
             'requestor_name' => $this->requestor_name,
 
             'service_printing' => $this->service_printing,
@@ -43,8 +47,6 @@ class OtherItServiceRequestResource extends JsonResource
             'activity_time' => $this->activity_time,
             'activity_venue' => $this->activity_venue,
 
-            'assigned_personnel' => $this->assigned_personnel,
-            'date_received' => $this->date_received,
             'action_taken' => $this->action_taken,
 
             'feedback_rating' => $this->feedback_rating,

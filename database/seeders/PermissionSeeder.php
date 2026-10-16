@@ -7,8 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 class PermissionSeeder extends Seeder
 {
-    /**
-     */
     public function run(): void
     {
         $base = '2026-06-24 15:25:54';
@@ -104,6 +102,14 @@ class PermissionSeeder extends Seeder
             137 => 'requests.is_change.delete',
         ];
 
+        // Accept/assign workflow shared by the request modules
+        // (docs/adr/0002-request-workflow.md).
+        $requestWorkflowTitles = [
+            138 => 'requests.accept', 139 => 'requests.assign',
+            140 => 'requests.complete', 141 => 'requests.cancel',
+            142 => 'requests.reopen',
+        ];
+
         $rows = [];
         foreach ($baseTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => $base, 'updated_at' => $base];
@@ -136,6 +142,9 @@ class PermissionSeeder extends Seeder
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
         foreach ($isChangeTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($requestWorkflowTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
 

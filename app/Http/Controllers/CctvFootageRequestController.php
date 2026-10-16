@@ -8,6 +8,7 @@ use App\Http\Resources\CctvFootageRequestResource;
 use App\Models\CctvFootageRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -31,21 +32,24 @@ class CctvFootageRequestController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', Rule::in(CctvFootageRequest::STATUSES)],
+            ...CctvFootageRequest::listFilterRules(),
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
             'order' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = CctvFootageRequest::query()
+            ->with('personnel')
             ->when($filters['search'] ?? null, function ($q, string $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('control_number', 'like', "%{$search}%")
                         ->orWhere('requester_name', 'like', "%{$search}%")
-                        ->orWhere('camera_location', 'like', "%{$search}%");
+                        ->orWhere('camera_location', 'like', "%{$search}%")
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
                 });
             })
-            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status));
+            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile);
 
         if (! empty($filters['sort'])) {
             $query->orderBy($filters['sort'], $filters['order'] ?? 'asc');
@@ -72,23 +76,24 @@ class CctvFootageRequestController extends Controller
 
         $record = CctvFootageRequest::createWithControlNumber($request->cctvAttributes());
 
-        return new CctvFootageRequestResource($record);
+        return new CctvFootageRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(CctvFootageRequest $cctvFootageRequest)
     {
         Gate::authorize('requests.cctv_footage.view');
 
-        return new CctvFootageRequestResource($cctvFootageRequest);
+        return new CctvFootageRequestResource($cctvFootageRequest->load('personnel'));
     }
 
+    /** Form fields only -- status and personnel change through RequestWorkflowController. */
     public function update(UpdateCctvFootageRequest $request, CctvFootageRequest $cctvFootageRequest)
     {
         Gate::authorize('requests.cctv_footage.update');
 
         $cctvFootageRequest->update($request->cctvAttributes());
 
-        return new CctvFootageRequestResource($cctvFootageRequest);
+        return new CctvFootageRequestResource($cctvFootageRequest->load('personnel'));
     }
 
     public function destroy(CctvFootageRequest $cctvFootageRequest)

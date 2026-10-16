@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Resources\Concerns\HasWorkflowFields;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class CctvFootageRequestResource extends JsonResource
 {
+    use HasWorkflowFields;
+
     /**
      * @return array<string, mixed>
      */
@@ -15,8 +18,7 @@ class CctvFootageRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'control_number' => $this->control_number,
-            'status' => $this->status,
-            'next_statuses' => $this->nextStatuses(),
+            ...$this->workflowFields($request),
 
             'date_of_request' => $this->date_of_request?->format('Y-m-d'),
             'requester_name' => $this->requester_name,
@@ -40,11 +42,6 @@ class CctvFootageRequestResource extends JsonResource
 
             'documents_presented' => $this->documents_presented ?? [],
 
-            'recommended_at' => $this->recommended_at,
-            'approved_at' => $this->approved_at,
-            'denied_at' => $this->denied_at,
-            'denial_reason' => $this->denial_reason,
-
             'extracted_at' => $this->extracted_at?->format('Y-m-d H:i'),
             'camera_name' => $this->camera_name,
             'nvr_number' => $this->nvr_number,
@@ -53,8 +50,10 @@ class CctvFootageRequestResource extends JsonResource
 
             'released_by' => $this->released_by,
             'received_by' => $this->received_by,
-            'released_at' => $this->released_at,
-            'cancelled_at' => $this->cancelled_at,
+
+            'feedback_rating' => $this->feedback_rating,
+            'feedback_name' => $this->feedback_name,
+            'feedback_date' => $this->feedback_date?->format('Y-m-d'),
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

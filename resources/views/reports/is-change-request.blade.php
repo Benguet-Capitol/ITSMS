@@ -132,6 +132,10 @@
     $record = $requestRecord;
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
+
+    // "Action by (Programmer)": the people on the request and when it was
+    // first accepted (docs/adr/0002-request-workflow.md).
+    $programmers = $record->personnel->pluck('display_name')->join(', ');
 @endphp
 
 @if ($formCode)
@@ -223,8 +227,8 @@
             Action by:
             <span class="hint">(Programmer)</span>
         </td>
-        <td colspan="2"><span class="sub">Name:</span>{{ $record->programmer_name }}</td>
-        <td><span class="sub">Date received request:</span>{{ $longDate($record->date_received) }}</td>
+        <td colspan="2"><span class="sub">Name:</span>{{ $programmers }}</td>
+        <td><span class="sub">Date received request:</span>{{ $longDate($record->accepted_at) }}</td>
     </tr>
     <tr>
         <td class="label" rowspan="2">

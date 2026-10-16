@@ -8,6 +8,7 @@ use App\Http\Resources\IsChangeRequestResource;
 use App\Models\IsChangeRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -18,6 +19,7 @@ class IsChangeRequestController extends Controller
     private const SORTABLE = [
         'control_number',
         'status',
+        'stage',
         'request_type',
         'priority',
         'information_system',
@@ -33,7 +35,8 @@ class IsChangeRequestController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', Rule::in(array_keys(IsChangeRequest::STATUSES))],
+            ...IsChangeRequest::listFilterRules(),
+            'stage' => ['nullable', 'string', Rule::in(array_keys(IsChangeRequest::STAGES))],
             'request_type' => ['nullable', 'string', Rule::in(array_keys(IsChangeRequest::REQUEST_TYPES))],
             'priority' => ['nullable', 'string', Rule::in(array_keys(IsChangeRequest::PRIORITIES))],
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
@@ -42,6 +45,7 @@ class IsChangeRequestController extends Controller
         ]);
 
         $query = IsChangeRequest::query()
+            ->with('personnel')
             ->when($filters['search'] ?? null, function ($q, string $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('control_number', 'like', "%{$search}%")
@@ -49,10 +53,12 @@ class IsChangeRequestController extends Controller
                         ->orWhere('department_office', 'like', "%{$search}%")
                         ->orWhere('modules_affected', 'like', "%{$search}%")
                         ->orWhere('requested_by', 'like', "%{$search}%")
-                        ->orWhere('programmer_name', 'like', "%{$search}%");
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
                 });
             })
             ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
+            ->when($filters['stage'] ?? null, fn ($q, string $stage) => $q->where('stage', $stage))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile)
             ->when($filters['request_type'] ?? null, fn ($q, string $type) => $q->where('request_type', $type))
             ->when($filters['priority'] ?? null, fn ($q, string $priority) => $q->where('priority', $priority));
 
@@ -88,23 +94,27 @@ class IsChangeRequestController extends Controller
 
         $record = IsChangeRequest::createWithControlNumber($request->isChangeAttributes());
 
-        return new IsChangeRequestResource($record);
+        return new IsChangeRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(IsChangeRequest $isChangeRequest)
     {
         Gate::authorize('requests.is_change.view');
 
-        return new IsChangeRequestResource($isChangeRequest);
+        return new IsChangeRequestResource($isChangeRequest->load('personnel'));
     }
 
+    /**
+     * Form fields and the development step only -- status and personnel
+     * change through RequestWorkflowController.
+     */
     public function update(UpdateIsChangeRequest $request, IsChangeRequest $isChangeRequest)
     {
         Gate::authorize('requests.is_change.update');
 
         $isChangeRequest->update($request->isChangeAttributes());
 
-        return new IsChangeRequestResource($isChangeRequest);
+        return new IsChangeRequestResource($isChangeRequest->load('personnel'));
     }
 
     public function destroy(IsChangeRequest $isChangeRequest)
@@ -124,7 +134,7 @@ class IsChangeRequestController extends Controller
             // 8.5" x 13" portrait (612 x 936 pt), single copy -- the
             // official form has no separate IT/client copies.
             $pdf = Pdf::loadView('reports.is-change-request', [
-                'requestRecord' => $isChangeRequest,
+                'requestRecord' => $isChangeRequest->load('personnel'),
                 'formCode' => config('is_change.form_code'),
                 'requestTypes' => IsChangeRequest::REQUEST_TYPES,
                 'priorities' => IsChangeRequest::PRIORITIES,

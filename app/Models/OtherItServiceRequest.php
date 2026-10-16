@@ -2,16 +2,33 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
 use App\Models\Concerns\HasDateSchedule;
+use App\Models\Concerns\HasRequesterOffice;
+use App\Models\Concerns\HasRequestWorkflow;
+use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Status follows the shared request workflow (App\Enums\RequestStatus) and
+ * is set only by RequestWorkflowController. The control number is
+ * server-assigned (YYYY-NNNN, restarting each year) like the other request
+ * types; numbers typed in before that (e.g. "2026-07-45") are kept.
+ */
 class OtherItServiceRequest extends Model
 {
-    use HasDateSchedule;
+    use HasDateSchedule, HasRequesterOffice, HasRequestWorkflow, HasYearlyControlNumber;
+
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requestor_name';
+
+    /** Department/Office text column (HasRequesterOffice). */
+    public const OFFICE_FIELD = 'department_office';
+
+    public const ALLOWS_OTHER_AGENCY = true;
 
     protected $fillable = [
         'control_number',
-        'status',
         'date_of_request',
         'department_office',
         'requestor_name',
@@ -35,12 +52,9 @@ class OtherItServiceRequest extends Model
         'activity_time',
         'activity_venue',
 
-        'assigned_personnel',
-        'date_received',
         'action_taken',
 
         'feedback_rating',
-        'feedback_name',
         'feedback_date',
     ];
 
@@ -49,7 +63,7 @@ class OtherItServiceRequest extends Model
      * (not null) for services that weren't ticked.
      */
     protected $attributes = [
-        'status' => 'pending',
+        'status' => RequestStatus::Pending->value,
         'service_printing' => false,
         'service_information_material' => false,
         'service_program_paper' => false,
@@ -65,7 +79,6 @@ class OtherItServiceRequest extends Model
 
     protected $casts = [
         'date_of_request' => 'date',
-        'date_received' => 'date',
         'feedback_date' => 'date',
         'service_printing' => 'boolean',
         'service_information_material' => 'boolean',

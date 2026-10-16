@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RequestStatus;
 use App\Exports\OtherItServiceReportExport;
 use App\Models\OtherItServiceRequest;
 use App\Services\PdfImageService;
@@ -14,9 +15,6 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class OtherItServiceReportController extends Controller
 {
-    /**
-	 *
-     */
     public function summary(Request $request)
     {
         Gate::authorize('requests.other_it_services.report');
@@ -159,20 +157,13 @@ class OtherItServiceReportController extends Controller
             $query->whereYear('date_of_request', (int) $request->input('year'));
         }
 
-        $requests = $query->get();
+        $requests = $query->with('personnel')->get();
 
-        $byStatus = [
-            'pending' => 0,
-            'in_progress' => 0,
-            'completed' => 0,
-            'on_hold' => 0,
-            'cancelled' => 0,
-        ];
+        // Every workflow status, zero-filled, in lifecycle order.
+        $byStatus = array_fill_keys(RequestStatus::values(), 0);
 
-        foreach ($requests->groupBy('status') as $status => $group) {
-            if (array_key_exists($status, $byStatus)) {
-                $byStatus[$status] = $group->count();
-            }
+        foreach ($requests->groupBy(fn ($r) => $r->status->value) as $status => $group) {
+            $byStatus[$status] = $group->count();
         }
 
         $byMonth = $requests
@@ -186,9 +177,12 @@ class OtherItServiceReportController extends Controller
             ->map(fn ($group) => $group->count())
             ->sortDesc();
 
+        // A request worked by several people counts once for each of them.
         $byPersonnel = $requests
-            ->groupBy(fn ($r) => $r->assigned_personnel ?: 'Unassigned')
-            ->map(fn ($group) => $group->count())
+            ->flatMap(fn ($r) => $r->personnel->isEmpty()
+                ? ['Unassigned']
+                : $r->personnel->pluck('display_name')->all())
+            ->countBy()
             ->sortDesc();
 
         return [

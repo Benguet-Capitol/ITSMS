@@ -8,6 +8,7 @@ use App\Http\Resources\DesignRequestResource;
 use App\Models\DesignRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -32,25 +33,27 @@ class DesignRequestController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', Rule::in(DesignRequest::STATUSES)],
+            ...DesignRequest::listFilterRules(),
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
             'order' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = DesignRequest::query()
+            ->with(['personnel', 'agency'])
             ->when($filters['search'] ?? null, function ($q, string $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('control_number', 'like', "%{$search}%")
                         ->orWhere('requester_name', 'like', "%{$search}%")
                         ->orWhere('department_office', 'like', "%{$search}%")
-                        ->orWhere('assigned_personnel', 'like', "%{$search}%")
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"))
                         // Matches item values and "Others" specifications
                         // inside the JSON item list (e.g. "tarpaulin").
                         ->orWhere('items', 'like', "%{$search}%");
                 });
             })
-            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status));
+            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile);
 
         if (! empty($filters['sort'])) {
             $query->orderBy($filters['sort'], $filters['order'] ?? 'asc');
@@ -77,23 +80,24 @@ class DesignRequestController extends Controller
 
         $record = DesignRequest::createWithControlNumber($request->designAttributes());
 
-        return new DesignRequestResource($record);
+        return new DesignRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(DesignRequest $designRequest)
     {
         Gate::authorize('requests.design.view');
 
-        return new DesignRequestResource($designRequest);
+        return new DesignRequestResource($designRequest->load('personnel'));
     }
 
+    /** Form fields only -- status and personnel change through RequestWorkflowController. */
     public function update(UpdateDesignRequest $request, DesignRequest $designRequest)
     {
         Gate::authorize('requests.design.update');
 
         $designRequest->update($request->designAttributes());
 
-        return new DesignRequestResource($designRequest);
+        return new DesignRequestResource($designRequest->load('personnel'));
     }
 
     public function destroy(DesignRequest $designRequest)
@@ -113,7 +117,7 @@ class DesignRequestController extends Controller
             // 13" x 8.5" folio, landscape (936 x 612 pt) -- the official
             // ICT-10 sheet prints the PGO-IT/MIS and client copies side by side.
             $pdf = Pdf::loadView('reports.design-request', [
-                'requestRecord' => $designRequest,
+                'requestRecord' => $designRequest->load('personnel'),
                 'formCode' => config('design.form_code'),
                 'items' => DesignRequest::ITEMS,
                 'fileFormats' => DesignRequest::FILE_FORMATS,

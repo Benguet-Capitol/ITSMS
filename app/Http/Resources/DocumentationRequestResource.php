@@ -2,11 +2,14 @@
 
 namespace App\Http\Resources;
 
+use App\Http\Resources\Concerns\HasWorkflowFields;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class DocumentationRequestResource extends JsonResource
 {
+    use HasWorkflowFields;
+
     /**
      * @return array<string, mixed>
      */
@@ -15,10 +18,11 @@ class DocumentationRequestResource extends JsonResource
         return [
             'id' => $this->id,
             'control_number' => $this->control_number,
-            'status' => $this->status,
+            ...$this->workflowFields($request),
 
             'date_of_request' => $this->date_of_request?->format('Y-m-d'),
             'department_office' => $this->department_office,
+            ...$this->officeResourceFields(),
             'requestor_name' => $this->requestor_name,
 
             'service_photo' => $this->service_photo,
@@ -34,8 +38,6 @@ class DocumentationRequestResource extends JsonResource
             'specific_shots' => $this->specific_shots,
             'additional_notes' => $this->additional_notes,
 
-            'assigned_personnel' => $this->assigned_personnel,
-            'date_received' => $this->date_received?->format('Y-m-d'),
             'action_taken' => $this->action_taken,
 
             'feedback_rating' => $this->feedback_rating,

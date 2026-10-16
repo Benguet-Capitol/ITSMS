@@ -8,6 +8,7 @@ use App\Http\Resources\NetworkAssistanceRequestResource;
 use App\Models\NetworkAssistanceRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -32,13 +33,14 @@ class NetworkAssistanceRequestController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', Rule::in(NetworkAssistanceRequest::STATUSES)],
+            ...NetworkAssistanceRequest::listFilterRules(),
             'sort' => ['nullable', 'string', Rule::in(self::SORTABLE)],
             'order' => ['nullable', 'string', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $query = NetworkAssistanceRequest::query()
+            ->with(['personnel', 'agency'])
             ->when($filters['search'] ?? null, function ($q, string $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('control_number', 'like', "%{$search}%")
@@ -46,10 +48,11 @@ class NetworkAssistanceRequestController extends Controller
                         ->orWhere('department_office', 'like', "%{$search}%")
                         ->orWhere('program_activity_details', 'like', "%{$search}%")
                         ->orWhere('venue', 'like', "%{$search}%")
-                        ->orWhere('assigned_personnel', 'like', "%{$search}%");
+                        ->orWhereHas('personnel', fn ($q) => $q->where('display_name', 'like', "%{$search}%"));
                 });
             })
-            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status));
+            ->when($filters['status'] ?? null, fn ($q, string $status) => $q->where('status', $status))
+            ->forTab($filters['tab'] ?? null, Auth::user()->profile);
 
         if (! empty($filters['sort'])) {
             $query->orderBy($filters['sort'], $filters['order'] ?? 'asc');
@@ -76,23 +79,24 @@ class NetworkAssistanceRequestController extends Controller
 
         $record = NetworkAssistanceRequest::createWithControlNumber($request->validated());
 
-        return new NetworkAssistanceRequestResource($record);
+        return new NetworkAssistanceRequestResource($record->refresh()->load('personnel'));
     }
 
     public function show(NetworkAssistanceRequest $networkAssistanceRequest)
     {
         Gate::authorize('requests.network_assistance.view');
 
-        return new NetworkAssistanceRequestResource($networkAssistanceRequest);
+        return new NetworkAssistanceRequestResource($networkAssistanceRequest->load('personnel'));
     }
 
+    /** Form fields only -- status and personnel change through RequestWorkflowController. */
     public function update(UpdateNetworkAssistanceRequest $request, NetworkAssistanceRequest $networkAssistanceRequest)
     {
         Gate::authorize('requests.network_assistance.update');
 
         $networkAssistanceRequest->update($request->validated());
 
-        return new NetworkAssistanceRequestResource($networkAssistanceRequest);
+        return new NetworkAssistanceRequestResource($networkAssistanceRequest->load('personnel'));
     }
 
     public function destroy(NetworkAssistanceRequest $networkAssistanceRequest)
@@ -112,7 +116,7 @@ class NetworkAssistanceRequestController extends Controller
             // Letter portrait -- the official ICT-15 sheet stacks the
             // PGO-IT/MIS file copy above the client copy on one page.
             $pdf = Pdf::loadView('reports.network-assistance-request', [
-                'requestRecord' => $networkAssistanceRequest,
+                'requestRecord' => $networkAssistanceRequest->load('personnel'),
                 'formCode' => config('network_assistance.form_code'),
                 'services' => NetworkAssistanceRequest::SERVICES,
             ])->setPaper('letter', 'portrait');

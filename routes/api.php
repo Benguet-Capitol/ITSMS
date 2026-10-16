@@ -26,6 +26,7 @@ use App\Http\Controllers\OtherItServiceRequestController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RequestWorkflowController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SolutionController;
 use App\Http\Controllers\TicketComplexityLevelController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Middleware\AuthGates;
 use App\Http\Resources\UserResource;
 use App\Services\HrisClientService;
+use App\Support\RequestTypes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -186,6 +188,32 @@ Route::middleware([
 
     /*
     |--------------------------------------------------------------------------
+    | Request workflow (accept/assign, shared by every type in RequestTypes)
+    |--------------------------------------------------------------------------
+    |
+    | Permissions are checked in the controller: the type's
+    | requests.<type>.view plus the action's own permission.
+    */
+
+    Route::prefix('requests/{type}/{id}')
+        ->whereIn('type', array_keys(RequestTypes::TYPES))
+        ->whereNumber('id')
+        ->controller(RequestWorkflowController::class)
+        ->group(function () {
+            Route::post('accept', 'accept');
+            Route::post('unaccept', 'unaccept');
+            Route::post('assign', 'assign');
+            Route::delete('personnel/{profileId}', 'removePersonnel')->whereNumber('profileId');
+            Route::post('hold', 'hold');
+            Route::post('resume', 'resume');
+            Route::post('finish', 'finish');
+            Route::post('complete', 'complete');
+            Route::post('cancel', 'cancel');
+            Route::post('reopen', 'reopen');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
     | Lookup/select routes
     |--------------------------------------------------------------------------
     |
@@ -259,6 +287,11 @@ Route::middleware([
             CommonProblemController::class,
             'select',
         ])->middleware('can:common_problems.select');
+
+        Route::get('request-personnel', [
+            RequestWorkflowController::class,
+            'personnelOptions',
+        ])->middleware('can:requests.assign');
     });
 
     /*

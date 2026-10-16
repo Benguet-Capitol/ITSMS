@@ -24,6 +24,7 @@ class StoreIsChangeRequest extends FormRequest
         return [
             'date_of_request' => ['required', 'date'],
             'department_office' => ['required', 'string', 'max:255'],
+            ...IsChangeRequest::officeRules(),
             'information_system' => ['required', 'string', 'max:255'],
 
             'request_type' => ['required', 'string', Rule::in(array_keys(IsChangeRequest::REQUEST_TYPES))],
@@ -42,6 +43,7 @@ class StoreIsChangeRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...IsChangeRequest::officeMessages(),
             'request_type_other.required_if' => 'Please specify the other type of request.',
             'attachments_description.required' => 'List the documentation/sample output attached for the developer.',
             'date_required.after_or_equal' => 'The date required cannot be before the date of request.',

@@ -134,6 +134,9 @@
     $check = fn (bool $value) => $value ? '✓' : '';
     $longDate = fn ($date) => $date ? \Carbon\Carbon::parse($date)->format('F d, Y') : '';
 
+    // Workflow personnel (docs/adr/0002-request-workflow.md).
+    $assignedTo = $record->personnel->pluck('display_name')->join(', ');
+
     $copies = [
         ['label' => 'PGO-IT/MIS FILE', 'feedback' => true],
         ['label' => "CLIENT'S COPY", 'feedback' => false],
@@ -219,7 +222,7 @@
             <table class="section" style="margin-bottom:0">
                 <tr>
                     <td class="label">Assigned to:</td>
-                    <td colspan="3"><span class="underline">{{ $record->assigned_personnel }}</span></td>
+                    <td colspan="3"><span class="underline">{{ $assignedTo }}</span></td>
                 </tr>
                 <tr>
                     <td class="label">Created by:</td>

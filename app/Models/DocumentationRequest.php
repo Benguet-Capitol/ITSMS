@@ -2,16 +2,29 @@
 
 namespace App\Models;
 
+use App\Enums\RequestStatus;
 use App\Models\Concerns\HasDateSchedule;
+use App\Models\Concerns\HasRequesterOffice;
+use App\Models\Concerns\HasRequestWorkflow;
 use App\Models\Concerns\HasYearlyControlNumber;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * Status follows the shared request workflow (App\Enums\RequestStatus) and
+ * is set only by RequestWorkflowController -- the form has no approval
+ * chain of its own.
+ */
 class DocumentationRequest extends Model
 {
-    use HasDateSchedule, HasYearlyControlNumber;
+    use HasDateSchedule, HasRequesterOffice, HasRequestWorkflow, HasYearlyControlNumber;
 
-    /** Same lifecycle as Other IT Service requests -- the form has no approval chain. */
-    public const STATUSES = ['pending', 'in_progress', 'completed', 'on_hold', 'cancelled'];
+    /** Who gives the requestor's feedback (HasRequestWorkflow). */
+    public const REQUESTER_FIELD = 'requestor_name';
+
+    /** Department/Office text column (HasRequesterOffice). */
+    public const OFFICE_FIELD = 'department_office';
+
+    public const ALLOWS_OTHER_AGENCY = true;
 
     /** Service checkbox column => label printed on form ICT-11. */
     public const SERVICES = [
@@ -22,7 +35,6 @@ class DocumentationRequest extends Model
 
     protected $fillable = [
         'control_number',
-        'status',
         'date_of_request',
         'department_office',
         'requestor_name',
@@ -34,16 +46,13 @@ class DocumentationRequest extends Model
         'documentation_end_date',
         'specific_shots',
         'additional_notes',
-        'assigned_personnel',
-        'date_received',
         'action_taken',
         'feedback_rating',
-        'feedback_name',
         'feedback_date',
     ];
 
     protected $attributes = [
-        'status' => 'pending',
+        'status' => RequestStatus::Pending->value,
         'service_photo' => false,
         'service_video' => false,
         'service_live_feed' => false,
@@ -53,7 +62,6 @@ class DocumentationRequest extends Model
         'date_of_request' => 'date:Y-m-d',
         'documentation_date' => 'date:Y-m-d',
         'documentation_end_date' => 'date:Y-m-d',
-        'date_received' => 'date:Y-m-d',
         'feedback_date' => 'date:Y-m-d',
         'service_photo' => 'boolean',
         'service_video' => 'boolean',
