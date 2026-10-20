@@ -48,6 +48,7 @@ class Ticket extends Model
         'date',
         'accepted_at',
         'resolved_at',
+        'assessed_at',
         'reopened_at',
         'released_at',
         'released_by',
@@ -65,6 +66,7 @@ class Ticket extends Model
         'service_method' => ServiceMethod::class,
         'accepted_at' => 'datetime',
         'resolved_at' => 'datetime',
+        'assessed_at' => 'datetime',
         'reopened_at' => 'datetime',
     ];
 

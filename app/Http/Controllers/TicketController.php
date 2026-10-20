@@ -487,6 +487,7 @@ class TicketController extends Controller
             'query_status' => TicketStatus::InProgress,
             'request_status' => TicketStatus::Reopened,
             'resolved_at' => null,
+            'assessed_at' => null,
             'reopened_at' => now(),
             'cancellation_reason' => null,
         ]);
@@ -530,6 +531,7 @@ class TicketController extends Controller
         $ticket->update([
             'query_status' => TicketStatus::Assessed,
             'request_status' => TicketStatus::Closed,
+            'assessed_at' => now(),
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
