@@ -30,7 +30,8 @@ class UpdateTicketRequest extends FormRequest
             'contact_number' => 'nullable|string',
             'is_other_agency' => 'boolean',
             'full_name' => 'nullable|string',
-            'client_name' => 'nullable|string|max:255',
+            // With no inventory there's no owner to name the client from.
+            'client_name' => 'nullable|required_without:inventory_id|string|max:255',
 
             'related_ticket_id' => 'nullable|exists:tickets,id',
         ];
@@ -88,6 +89,7 @@ class UpdateTicketRequest extends FormRequest
             'item_type_id.required' => 'The :attribute is required.',
             'concern.required' => 'The :attribute is required.',
             'client_name.max' => 'The :attribute may not be greater than 255 characters.',
+            'client_name.required_without' => 'Client name is required when no inventory is selected.',
         ];
     }
 }

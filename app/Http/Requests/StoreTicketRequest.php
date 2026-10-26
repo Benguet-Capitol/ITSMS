@@ -34,7 +34,8 @@ class StoreTicketRequest extends FormRequest
             'contact_number' => 'nullable|string',
             'is_other_agency' => 'boolean',
             'full_name' => 'nullable|string',
-            'client_name' => 'nullable|string|max:255',
+            // With no inventory there's no owner to name the client from.
+            'client_name' => 'nullable|required_without:inventory_id|string|max:255',
 
             'office_id' => 'nullable|string|max:255',
             'office_code' => 'nullable|string|max:255',
@@ -89,6 +90,7 @@ class StoreTicketRequest extends FormRequest
             'query_status.required' => 'The :attribute is required.',
             'date.required' => 'The :attribute is required.',
             'client_name.max' => 'The :attribute may not be greater than 255 characters.',
+            'client_name.required_without' => 'Client name is required when no inventory is selected.',
             'office_id.max' => 'The :attribute may not be greater than 255 characters.',
             'office_code.max' => 'The :attribute may not be greater than 255 characters.',
             'office_desc.max' => 'The :attribute may not be greater than 255 characters.',
