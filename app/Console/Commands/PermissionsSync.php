@@ -52,7 +52,9 @@ class PermissionsSync extends Command
 
         'requests.inspection.view', 'requests.inspection.create', 'requests.inspection.update',
         'requests.inspection.print', 'requests.inspection.delete',
-        // Filing an inspection picks its inspectors from the list.
+        // Filing an inspection picks its inspectors from the list; IT
+        // technical staff also keep that list up to date.
+        'inspectors.view', 'inspectors.create', 'inspectors.update', 'inspectors.delete',
         'inspectors.select',
 
         'requests.accept',
@@ -68,12 +70,10 @@ class PermissionsSync extends Command
 
     /**
      * Granted to ADMIN_ROLES only: the request workflow's admin actions
-     * (docs/adr/0002-request-workflow.md) and managing the inspector list
-     * (docs/requests-inspection.md).
+     * (docs/adr/0002-request-workflow.md).
      */
     private const ADMIN_PERMISSIONS = [
         'requests.assign', 'requests.complete', 'requests.cancel', 'requests.reopen',
-        'inspectors.view', 'inspectors.create', 'inspectors.update', 'inspectors.delete',
     ];
 
     public function handle(): int

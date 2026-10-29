@@ -117,10 +117,10 @@ class PermissionRoleTableSeeder extends Seeder
             [143, 2], [144, 2], [145, 2], [146, 2], [147, 2],
             [143, 3], [144, 3], [145, 3], [146, 3], [147, 3],
 
-            // Inspectors -- the admins manage the list; everyone filing an inspection picks from it
+            // Inspectors -- all three roles manage the list and pick from it
             [148, 1], [149, 1], [150, 1], [151, 1], [152, 1],
             [148, 2], [149, 2], [150, 2], [151, 2], [152, 2],
-            [152, 3],
+            [148, 3], [149, 3], [150, 3], [151, 3], [152, 3],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);
