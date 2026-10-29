@@ -111,6 +111,16 @@ class PermissionRoleTableSeeder extends Seeder
 
             // Request forms pick the Department/Office from the HRIS office list
             [95, 3],
+
+            // Inspection Request -- same roles as the other request modules
+            [143, 1], [144, 1], [145, 1], [146, 1], [147, 1],
+            [143, 2], [144, 2], [145, 2], [146, 2], [147, 2],
+            [143, 3], [144, 3], [145, 3], [146, 3], [147, 3],
+
+            // Inspectors -- the admins manage the list; everyone filing an inspection picks from it
+            [148, 1], [149, 1], [150, 1], [151, 1], [152, 1],
+            [148, 2], [149, 2], [150, 2], [151, 2], [152, 2],
+            [152, 3],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);

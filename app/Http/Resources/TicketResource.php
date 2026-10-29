@@ -111,6 +111,10 @@ class TicketResource extends JsonResource
                 TicketStatus::AwaitingVendor,
             ]) && ! ($this->accepted_by_me ?? false),
 
+            // Duplicate clean-up: nobody on it yet (Ticket::isDeletable();
+            // the resolution/assessment check runs on delete).
+            'can_delete' => $this->resource->isDeletable(checkHistory: false),
+
             'can_unaccept' => ($this->accepted_by_me ?? false) && ! in_array($this->query_status, [
                 TicketStatus::Resolved,
                 TicketStatus::Assessed,

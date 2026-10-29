@@ -6,6 +6,7 @@ use App\Http\Resources\CctvFootageRequestResource;
 use App\Http\Resources\DesignRequestResource;
 use App\Http\Resources\DocumentationRequestResource;
 use App\Http\Resources\DtsUserRequestResource;
+use App\Http\Resources\InspectionRequestResource;
 use App\Http\Resources\IsChangeRequestResource;
 use App\Http\Resources\NetworkAssistanceRequestResource;
 use App\Http\Resources\OtherItServiceRequestResource;
@@ -13,6 +14,7 @@ use App\Models\CctvFootageRequest;
 use App\Models\DesignRequest;
 use App\Models\DocumentationRequest;
 use App\Models\DtsUserRequest;
+use App\Models\InspectionRequest;
 use App\Models\IsChangeRequest;
 use App\Models\NetworkAssistanceRequest;
 use App\Models\OtherItServiceRequest;
@@ -75,6 +77,13 @@ class RequestTypes
             'permission' => 'requests.is_change',
             'label' => 'IS Change Request',
             'path' => '/requests/is-change',
+        ],
+        'inspection' => [
+            'model' => InspectionRequest::class,
+            'resource' => InspectionRequestResource::class,
+            'permission' => 'requests.inspection',
+            'label' => 'Inspection Request',
+            'path' => '/requests/inspection',
         ],
     ];
 

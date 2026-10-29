@@ -9,6 +9,7 @@ use App\Models\Profile;
 use App\Models\ProfileOffice;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\ProfileEngagementService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -250,8 +251,15 @@ class UserController extends Controller
             'roles',
             'profile.departments',
         ])
-            ->get()
-            ->map(function ($user) {
+            ->get();
+
+        // What the busy people are on (tickets and requests), in one batch.
+        $currentWork = ProfileEngagementService::currentWork(
+            $users->pluck('profile.id')
+        );
+
+        $users = $users
+            ->map(function ($user) use ($currentWork) {
                 $profile = $user->profile;
 
                 $lastSeenAt = $profile?->last_seen_at
@@ -278,6 +286,9 @@ class UserController extends Controller
                     // Maintained by ProfileEngagementService from actual
                     // active tickets, independent of online/idle/offline.
                     'engagement' => $profile?->engagement,
+
+                    // The active tickets/requests behind that engagement.
+                    'current_work' => $profile ? ($currentWork[$profile->id] ?? []) : [],
 
                     'status_text' => $profile?->status_text,
                     'last_seen_at' => $profile?->last_seen_at,

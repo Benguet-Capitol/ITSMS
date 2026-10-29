@@ -42,16 +42,31 @@ trait HasRequestWorkflow
     public static function bootHasRequestWorkflow(): void
     {
         static::saving(function (self $request) {
+            if (! static::hasFeedback()) {
+                return;
+            }
+
             $request->feedback_name = $request->feedback_rating !== null
                 ? $request->requesterName()
                 : null;
         });
     }
 
+    /**
+     * Whether the type's form has the requestor's feedback (rating)
+     * section. A type without one sets HAS_FEEDBACK = false and needs no
+     * feedback columns or REQUESTER_FIELD; an admin then completes it
+     * without a rating.
+     */
+    public static function hasFeedback(): bool
+    {
+        return ! defined(static::class.'::HAS_FEEDBACK') || static::HAS_FEEDBACK;
+    }
+
     /** The requester's name, from the type's own requester column. */
     public function requesterName(): ?string
     {
-        return $this->{static::REQUESTER_FIELD};
+        return static::hasFeedback() ? $this->{static::REQUESTER_FIELD} : null;
     }
 
     public function initializeHasRequestWorkflow(): void
@@ -111,6 +126,10 @@ trait HasRequestWorkflow
      */
     public function completionRules(): array
     {
+        if (! static::hasFeedback()) {
+            return [];
+        }
+
         return [
             'feedback_rating' => ['required', 'integer', 'min:1', 'max:5'],
             'feedback_date' => ['required', 'date'],

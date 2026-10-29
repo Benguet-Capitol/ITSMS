@@ -26,6 +26,8 @@ trait HasWorkflowFields
             'cancellation_reason' => $this->cancellation_reason,
             // The requestor's feedback name is always this (HasRequestWorkflow).
             'requester' => $this->requesterName(),
+            // False when the type is completed without a rating.
+            'has_feedback' => $this->resource::hasFeedback(),
             'abilities' => $this->when(
                 $this->relationLoaded('personnel'),
                 fn () => $this->workflowAbilities($request->user()),

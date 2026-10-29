@@ -110,6 +110,15 @@ class PermissionSeeder extends Seeder
             142 => 'requests.reopen',
         ];
 
+        $inspectionTitles = [
+            143 => 'requests.inspection.view', 144 => 'requests.inspection.create',
+            145 => 'requests.inspection.update', 146 => 'requests.inspection.print',
+            147 => 'requests.inspection.delete',
+            148 => 'inspectors.view', 149 => 'inspectors.create',
+            150 => 'inspectors.update', 151 => 'inspectors.delete',
+            152 => 'inspectors.select',
+        ];
+
         $rows = [];
         foreach ($baseTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => $base, 'updated_at' => $base];
@@ -145,6 +154,9 @@ class PermissionSeeder extends Seeder
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
         foreach ($requestWorkflowTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($inspectionTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
 

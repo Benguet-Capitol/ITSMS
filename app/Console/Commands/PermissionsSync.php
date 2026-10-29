@@ -50,6 +50,11 @@ class PermissionsSync extends Command
         'requests.is_change.view', 'requests.is_change.create', 'requests.is_change.update',
         'requests.is_change.print', 'requests.is_change.delete',
 
+        'requests.inspection.view', 'requests.inspection.create', 'requests.inspection.update',
+        'requests.inspection.print', 'requests.inspection.delete',
+        // Filing an inspection picks its inspectors from the list.
+        'inspectors.select',
+
         'requests.accept',
 
         // Request forms pick the Department/Office from the HRIS office
@@ -61,9 +66,14 @@ class PermissionsSync extends Command
     /** Admin-only roles (mirrors PermissionRoleTableSeeder's request workflow block). */
     private const ADMIN_ROLES = ['Admin', 'It Admin Staff'];
 
-    /** Request workflow permissions granted to ADMIN_ROLES only (docs/adr/0002-request-workflow.md). */
+    /**
+     * Granted to ADMIN_ROLES only: the request workflow's admin actions
+     * (docs/adr/0002-request-workflow.md) and managing the inspector list
+     * (docs/requests-inspection.md).
+     */
     private const ADMIN_PERMISSIONS = [
         'requests.assign', 'requests.complete', 'requests.cancel', 'requests.reopen',
+        'inspectors.view', 'inspectors.create', 'inspectors.update', 'inspectors.delete',
     ];
 
     public function handle(): int

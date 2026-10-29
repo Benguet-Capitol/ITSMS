@@ -11,6 +11,8 @@ use App\Http\Controllers\DesignRequestController;
 use App\Http\Controllers\DocumentationRequestController;
 use App\Http\Controllers\DtsUserRequestController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\InspectionRequestController;
+use App\Http\Controllers\InspectorController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryReportController;
 use App\Http\Controllers\IsChangeRequestController;
@@ -155,6 +157,7 @@ Route::middleware([
         'usage',
     ]);
     Route::apiResource('measurement-units', MeasurementUnitController::class);
+    Route::apiResource('inspectors', InspectorController::class);
     Route::apiResource('ticket-complexity-levels', TicketComplexityLevelController::class);
     Route::apiResource('it-supplies', ItSupplyController::class);
     Route::apiResource(
@@ -184,6 +187,10 @@ Route::middleware([
     Route::apiResource(
         'is-change-requests',
         IsChangeRequestController::class
+    );
+    Route::apiResource(
+        'inspection-requests',
+        InspectionRequestController::class
     );
 
     /*
@@ -277,6 +284,11 @@ Route::middleware([
             TicketComplexityLevelController::class,
             'select',
         ])->middleware('can:ticket_complexity_levels.select');
+
+        Route::get('inspectors', [
+            InspectorController::class,
+            'select',
+        ])->middleware('can:inspectors.select');
 
         Route::get('offices', [
             OfficeController::class,
@@ -609,6 +621,20 @@ Route::middleware([
             'print',
         ]
     )->middleware('can:requests.is_change.print');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inspection request actions
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'inspection-requests/{inspection_request}/print',
+        [
+            InspectionRequestController::class,
+            'print',
+        ]
+    )->middleware('can:requests.inspection.print');
 
     /*
     |--------------------------------------------------------------------------

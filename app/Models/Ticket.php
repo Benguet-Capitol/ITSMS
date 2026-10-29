@@ -158,6 +158,30 @@ class Ticket extends Model
             ->orderByDesc('id');
     }
 
+    /**
+     * Deleting is only for removing a duplicate before anyone works on it:
+     * still Open/Queued with nobody on it. Un-accepting puts a ticket back
+     * in that state, so it also must never have been resolved or assessed.
+     * Uses the loaded personnel when there (the list), else queries.
+     */
+    public function isDeletable(bool $checkHistory = true): bool
+    {
+        if ($this->request_status !== TicketStatus::Open || $this->query_status !== TicketStatus::Queued) {
+            return false;
+        }
+
+        $hasPersonnel = $this->relationLoaded('personnel')
+            ? $this->personnel->isNotEmpty()
+            : $this->personnel()->exists();
+
+        if ($hasPersonnel) {
+            return false;
+        }
+
+        return ! $checkHistory
+            || (! $this->resolutions()->exists() && ! $this->assessment()->exists());
+    }
+
     public function relatedTicket()
     {
         return $this->belongsTo(Ticket::class, 'related_ticket_id');

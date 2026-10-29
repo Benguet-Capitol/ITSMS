@@ -21,7 +21,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class TicketController extends Controller
@@ -303,9 +305,27 @@ class TicketController extends Controller
         ]);
     }
 
-    public function show(Ticket $ticket)
+    /**
+     * One ticket, for the ticket view page: everything the list row has
+     * (employee names from HRIS included) plus its history.
+     */
+    public function show(Request $request, Ticket $ticket, HrisClientService $hris)
     {
         Gate::authorize('tickets.view');
+
+        // Same HRIS enrichment as index(); the ticket still loads without it.
+        $hrisUnavailable = false;
+
+        try {
+            $employeeMap = collect($hris->getEmployeesCached(10))
+                ->filter(fn ($e) => isset($e['id']))
+                ->keyBy(fn ($e) => (int) $e['id']);
+        } catch (\Throwable $e) {
+            $hrisUnavailable = true;
+            $employeeMap = collect();
+        }
+
+        $request->attributes->set('employeeMap', $employeeMap);
 
         $profileId = Auth::user()->profile->id;
 
@@ -330,16 +350,40 @@ class TicketController extends Controller
             ])
             ->findOrFail($ticket->id);
 
-        return TicketResource::make($ticket);
+        // Merged in rather than ->additional(), which would wrap the ticket
+        // in "data" and change the shape existing callers read.
+        return response()->json([
+            ...TicketResource::make($ticket)->resolve($request),
+            'meta' => ['hris_unavailable' => $hrisUnavailable],
+        ]);
     }
 
+    /**
+     * Removes a duplicate ticket. Only one nobody has accepted or been
+     * assigned to yet (Ticket::isDeletable()) -- anything worked on keeps
+     * its history. The ticket's notifications ("new ticket") go with it.
+     */
     public function destroy(Ticket $ticket)
     {
         Gate::authorize('tickets.delete');
 
-        $ticket->delete();
+        DB::transaction(function () use ($ticket) {
+            // Locked so someone accepting it at the same moment can't slip
+            // in between the check and the delete.
+            $locked = Ticket::query()->setEagerLoads([])->lockForUpdate()->findOrFail($ticket->id);
 
-        return new TicketResource($ticket);
+            if (! $locked->isDeletable()) {
+                abort(422, "Ticket {$locked->ticket_number} can't be deleted: someone has already accepted or worked on it. Only a ticket nobody has accepted yet can be deleted.");
+            }
+
+            DatabaseNotification::query()->where('data->ticket_id', $locked->id)->delete();
+
+            $locked->delete();
+        });
+
+        return response()->json([
+            'message' => "Ticket {$ticket->ticket_number} deleted.",
+        ]);
     }
 
     public function accept(Request $request, Ticket $ticket)
