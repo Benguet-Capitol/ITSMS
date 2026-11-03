@@ -134,12 +134,19 @@ class InspectionRequest extends Model
             ->all();
     }
 
-    /** The PO number, or the procurement mode when there's no PO. */
-    public function purchaseReference(): string
+    /**
+     * The PO number, or the procurement mode when there's no PO; null while
+     * neither is known yet.
+     */
+    public function purchaseReference(): ?string
     {
-        return $this->procurement_mode === 'purchase_order' && $this->po_number
-            ? "PO {$this->po_number}"
-            : (self::PROCUREMENT_MODES[$this->procurement_mode] ?? $this->procurement_mode);
+        if ($this->po_number) {
+            return "PO {$this->po_number}";
+        }
+
+        return $this->procurement_mode
+            ? (self::PROCUREMENT_MODES[$this->procurement_mode] ?? $this->procurement_mode)
+            : null;
     }
 
     /** The inspection must be recorded before it's marked for completion. */

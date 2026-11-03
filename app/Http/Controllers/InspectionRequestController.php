@@ -136,14 +136,15 @@ class InspectionRequestController extends Controller
                 'results' => InspectionRequest::RESULTS,
             ])->setPaper([0, 0, 612, 936]);
 
+            // The end user may not be known yet; leave that part out.
             $filename = implode('_', array_map(
                 fn ($part) => preg_replace('/[^A-Za-z0-9\-]/', '-', (string) $part),
-                [
+                array_filter([
                     'Inspection-Report',
                     $inspectionRequest->control_number,
                     $inspectionRequest->office_code ?: $inspectionRequest->end_user_office,
                     now()->format('Y-m-d_Hi'),
-                ]
+                ])
             )).'.pdf';
 
             return $pdf->download($filename);

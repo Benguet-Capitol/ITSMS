@@ -34,12 +34,12 @@ class StoreInspectionRequest extends FormRequest
     {
         return [
             'date_of_request' => ['required', 'date'],
-            'end_user_office' => ['required', 'string', 'max:255'],
+            'end_user_office' => ['nullable', 'string', 'max:255'],
             ...InspectionRequest::officeRules(),
 
-            'procurement_mode' => ['required', 'string', Rule::in(array_keys(InspectionRequest::PROCUREMENT_MODES))],
-            'po_number' => ['nullable', 'string', 'max:50', 'required_if:procurement_mode,purchase_order'],
-            'supplier' => ['required', 'string', 'max:255'],
+            'procurement_mode' => ['nullable', 'string', Rule::in(array_keys(InspectionRequest::PROCUREMENT_MODES))],
+            'po_number' => ['nullable', 'string', 'max:50'],
+            'supplier' => ['nullable', 'string', 'max:255'],
 
             'inspector_ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_INSPECTORS],
             'inspector_ids.*' => ['integer', 'distinct', $this->inspectorExistsRule()],
@@ -57,7 +57,6 @@ class StoreInspectionRequest extends FormRequest
     {
         return [
             ...InspectionRequest::officeMessages(),
-            'po_number.required_if' => 'Enter the PO number for a purchase order.',
             'inspector_ids.required' => 'Select at least one inspector.',
             'inspector_ids.min' => 'Select at least one inspector.',
             'inspector_ids.max' => 'An inspection can list at most '.self::MAX_INSPECTORS.' inspectors.',
@@ -87,7 +86,8 @@ class StoreInspectionRequest extends FormRequest
     /**
      * Validated data (minus the inspectors, which go to the pivot) with the
      * item list normalized (trimmed text, blank as null, unit costs to two
-     * decimals) and the PO number kept only for purchase orders.
+     * decimals), blank purchase details as null, and no PO number for the
+     * modes without one.
      *
      * @return array<string, mixed>
      */
@@ -95,10 +95,15 @@ class StoreInspectionRequest extends FormRequest
     {
         $data = $this->safe()->except('inspector_ids');
 
-        $data['po_number'] = $data['procurement_mode'] === 'purchase_order'
+        // The purchase details are often only known after the inspection,
+        // so each may be blank. A PO number is kept unless the mode says
+        // there's no purchase order (emergency, direct acquisition).
+        $data['end_user_office'] = self::blankToNull($data['end_user_office'] ?? null);
+        $data['procurement_mode'] = self::blankToNull($data['procurement_mode'] ?? null);
+        $data['po_number'] = in_array($data['procurement_mode'], [null, 'purchase_order'], true)
             ? self::blankToNull($data['po_number'] ?? null)
             : null;
-        $data['supplier'] = trim($data['supplier']);
+        $data['supplier'] = self::blankToNull($data['supplier'] ?? null);
 
         $data['items'] = collect($data['items'])
             ->map(fn (array $item) => [

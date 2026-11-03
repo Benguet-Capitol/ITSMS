@@ -28,7 +28,9 @@ class InspectionRequestResource extends JsonResource
             ...$this->officeResourceFields(),
 
             'procurement_mode' => $this->procurement_mode,
-            'procurement_mode_label' => InspectionRequest::PROCUREMENT_MODES[$this->procurement_mode] ?? $this->procurement_mode,
+            'procurement_mode_label' => $this->procurement_mode
+                ? (InspectionRequest::PROCUREMENT_MODES[$this->procurement_mode] ?? $this->procurement_mode)
+                : null,
             'po_number' => $this->po_number,
             'purchase_reference' => $this->purchaseReference(),
             'supplier' => $this->supplier,
