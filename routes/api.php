@@ -433,6 +433,13 @@ Route::middleware([
             'assess',
         ])->middleware('can:tickets.assess');
 
+        // The client's satisfaction rating, entered once the ticket is
+        // resolved or assessed. Whoever may resolve tickets may record it.
+        Route::post('rate', [
+            TicketController::class,
+            'rate',
+        ])->middleware('can:tickets.resolve');
+
         Route::get('assessment-report', [
             TicketController::class,
             'assessmentReport',

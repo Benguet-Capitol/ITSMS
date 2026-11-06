@@ -166,6 +166,10 @@ class TicketResource extends JsonResource
             'office_id' => $this->office_id,
             'office_code' => $this->office_code,
             'office_desc' => $this->office_desc,
+
+            'feedback_rating' => $this->feedback_rating,
+            'feedback_name' => $this->feedback_name,
+            'feedback_date' => $this->feedback_date?->format('Y-m-d'),
         ];
     }
 }

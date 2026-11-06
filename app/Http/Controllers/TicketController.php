@@ -17,6 +17,7 @@ use App\Notifications\TicketPersonnelJoinedNotification;
 use App\Services\HrisClientService;
 use App\Services\PdfImageService;
 use App\Services\ProfileEngagementService;
+use App\Services\TicketDashboardService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -25,6 +26,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class TicketController extends Controller
 {
@@ -506,6 +508,38 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
+    /**
+     * Record the client's satisfaction rating (1-5) and when it was given,
+     * the same rating the request types take on completion. The rater is
+     * the ticket's client, whose name the frontend sends as shown on the
+     * ticket (it comes from HRIS, which the API doesn't keep locally).
+     * Rating again replaces the earlier one.
+     */
+    public function rate(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.resolve');
+        $this->ensureWorkflowAllows($ticket, 'rate');
+
+        $data = $request->validate([
+            'feedback_rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'feedback_name' => ['nullable', 'string', 'max:255'],
+            'feedback_date' => ['required', 'date'],
+        ], [
+            'feedback_rating.required' => "Enter the client's rating.",
+            'feedback_date.required' => 'Enter the date of the rating.',
+        ]);
+
+        $ticket->forceFill([
+            'feedback_rating' => $data['feedback_rating'],
+            'feedback_name' => filled($data['feedback_name'] ?? null)
+                ? trim($data['feedback_name'])
+                : null,
+            'feedback_date' => $data['feedback_date'],
+        ])->save();
+
+        return new TicketResource($ticket);
+    }
+
     public function cancel(CancelTicketRequest $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
@@ -966,13 +1000,27 @@ class TicketController extends Controller
                 ? "A ticket that is {$status} can't be cancelled."
                 : 'Only personnel on this ticket or an Admin can cancel it.',
             'reopen' => 'Only resolved, assessed or cancelled tickets can be reopened.',
+            'rate' => 'Only resolved or assessed tickets can be rated.',
             default => $workReason,
         });
     }
 
-    public function dashboardSummary()
+    /**
+     * Dashboard KPIs, charts and monitoring lists (Sprint 7 -- see
+     * TicketDashboardService). `trend` picks the created-vs-resolved chart's
+     * buckets: daily (last 14 days, the default), monthly (12 months) or
+     * yearly (5 years).
+     *
+     * The four top-level counts below predate Sprint 7's `kpis` and are kept
+     * as they were, so nothing reading them breaks.
+     */
+    public function dashboardSummary(Request $request, TicketDashboardService $dashboard)
     {
         Gate::authorize('tickets.view');
+
+        $validated = $request->validate([
+            'trend' => ['nullable', Rule::in(TicketDashboardService::TREND_PERIODS)],
+        ]);
 
         $openStatuses = [
             TicketStatus::Open->value,
@@ -998,54 +1046,12 @@ class TicketController extends Controller
                 ->whereDate('updated_at', today())
                 ->count(),
 
-            'trend' => $this->dashboardTrend(),
-
             'breakdown' => Ticket::query()
                 ->selectRaw('query_status, COUNT(*) as count')
                 ->groupBy('query_status')
                 ->pluck('count', 'query_status'),
+
+            ...$dashboard->summary($validated['trend'] ?? 'daily'),
         ]);
-    }
-
-    /**
-     * Daily created-vs-resolved counts for the last 14 days (inclusive of
-     * today), for the dashboard trend chart. `resolved_at` (not
-     * `updated_at`) is used for the resolved series -- it's a dedicated
-     * timestamp set only by TicketController::resolve() and cleared on
-     * reopen, so it won't be skewed by unrelated field edits touching
-     * `updated_at` the way the existing "Resolved Today" KPI card is.
-     * MySQL's grouped query silently omits days with zero rows, so the
-     * gaps are filled with 0 in PHP after the fact.
-     */
-    private function dashboardTrend(): array
-    {
-        $since = Carbon::today()->subDays(13);
-
-        $createdByDay = Ticket::query()
-            ->where('created_at', '>=', $since)
-            ->selectRaw('DATE(created_at) as day, COUNT(*) as count')
-            ->groupBy('day')
-            ->pluck('count', 'day');
-
-        $resolvedByDay = Ticket::query()
-            ->whereNotNull('resolved_at')
-            ->where('resolved_at', '>=', $since)
-            ->selectRaw('DATE(resolved_at) as day, COUNT(*) as count')
-            ->groupBy('day')
-            ->pluck('count', 'day');
-
-        $trend = [];
-
-        for ($i = 13; $i >= 0; $i--) {
-            $day = Carbon::today()->subDays($i)->toDateString();
-
-            $trend[] = [
-                'date' => $day,
-                'created' => (int) ($createdByDay[$day] ?? 0),
-                'resolved' => (int) ($resolvedByDay[$day] ?? 0),
-            ];
-        }
-
-        return $trend;
     }
 }

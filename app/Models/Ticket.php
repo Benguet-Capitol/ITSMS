@@ -68,6 +68,7 @@ class Ticket extends Model
         'resolved_at' => 'datetime',
         'assessed_at' => 'datetime',
         'reopened_at' => 'datetime',
+        'feedback_date' => 'date',
     ];
 
     // query_status values that mean nobody is working the ticket anymore.
@@ -118,6 +119,9 @@ class Ticket extends Model
             'assess' => $isMine && ($isActive || $this->query_status === TicketStatus::Assessed),
             'cancel' => $isActive && ($isMine || $isAdmin),
             'reopen' => ! $isActive,
+            // The client rates finished work, not a cancelled ticket. Anyone
+            // allowed to resolve may record it, on the ticket or not.
+            'rate' => in_array($this->query_status, [TicketStatus::Resolved, TicketStatus::Assessed], true),
             default => false,
         };
     }
