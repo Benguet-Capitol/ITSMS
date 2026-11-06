@@ -395,18 +395,16 @@ class TicketController extends Controller
             return response()->json(['error' => 'Profile not found.'], 404);
         }
 
-        $alreadyAccepted = $ticket->personnel()->where('profile_id', $profile->id)->exists();
+        $this->ensureWorkflowAllows($ticket, 'accept');
 
-        if (! $alreadyAccepted) {
-            $ticket->personnel()->attach($profile->id);
+        $ticket->personnel()->attach($profile->id);
 
-            if ($ticket->personnel()->count() === 1) {
-                $ticket->update([
-                    'query_status' => TicketStatus::InProgress,
-                    'request_status' => TicketStatus::Accepted,
-                    'accepted_at' => now(),
-                ]);
-            }
+        if ($ticket->personnel()->count() === 1) {
+            $ticket->update([
+                'query_status' => TicketStatus::InProgress,
+                'request_status' => TicketStatus::Accepted,
+                'accepted_at' => now(),
+            ]);
         }
 
         ProfileEngagementService::syncTicket($ticket);
@@ -435,13 +433,7 @@ class TicketController extends Controller
             return response()->json(['error' => 'Profile not found.'], 404);
         }
 
-        $isAccepted = $ticket->personnel()->where('profile_id', $profile->id)->exists();
-
-        if (! $isAccepted) {
-            return response()->json([
-                'error' => 'You have not accepted this ticket.',
-            ], 422);
-        }
+        $this->ensureWorkflowAllows($ticket, 'unaccept');
 
         $ticket->personnel()->detach($profile->id);
 
@@ -461,6 +453,8 @@ class TicketController extends Controller
     public function checkStock(Request $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
+        $this->ensureWorkflowAllows($ticket, 'check_stock');
+
         $ticket->update([
             'query_status' => TicketStatus::CheckingStock,
         ]);
@@ -475,6 +469,8 @@ class TicketController extends Controller
     public function awaitPart(Request $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
+        $this->ensureWorkflowAllows($ticket, 'await_part');
+
         $ticket->update([
             'query_status' => TicketStatus::AwaitingPart,
         ]);
@@ -487,6 +483,8 @@ class TicketController extends Controller
     public function resolve(ResolveTicketRequest $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
+        $this->ensureWorkflowAllows($ticket, 'resolve');
+
         $data = $request->validated();
 
         $resolvedAt = now();
@@ -511,6 +509,8 @@ class TicketController extends Controller
     public function cancel(CancelTicketRequest $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
+        $this->ensureWorkflowAllows($ticket, 'cancel');
+
         $ticket->update([
             'query_status' => TicketStatus::Cancelled,
             'request_status' => TicketStatus::Closed,
@@ -525,10 +525,23 @@ class TicketController extends Controller
     public function reopen(Request $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
+        $this->ensureWorkflowAllows($ticket, 'reopen');
+
+        // A newer ticket may have been filed for the same item while this
+        // one was closed; reopening would leave two working the same issue.
+        if ($ticket->inventory_id && $ticket->it_service_id
+            && Ticket::hasUnfinishedFor($ticket->inventory_id, $ticket->it_service_id, $ticket->id)) {
+            abort(422, "Ticket {$ticket->ticket_number} can't be reopened: this inventory item already has an open ticket for this service type. Close that one first.");
+        }
+
         $ticket->assessment()->delete();
 
+        // A ticket cancelled before anyone accepted it has nobody to work
+        // it; it goes back to the queue instead of "in progress".
         $ticket->update([
-            'query_status' => TicketStatus::InProgress,
+            'query_status' => $ticket->personnel()->exists()
+                ? TicketStatus::InProgress
+                : TicketStatus::Queued,
             'request_status' => TicketStatus::Reopened,
             'resolved_at' => null,
             'assessed_at' => null,
@@ -544,6 +557,8 @@ class TicketController extends Controller
     public function assess(AssessTicketRequest $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
+        $this->ensureWorkflowAllows($ticket, 'assess');
+
         $data = $request->validated();
 
         $user = Auth::user();
@@ -795,16 +810,6 @@ class TicketController extends Controller
             $brandModel = ($brandModel ?: '—').' (Set)';
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Inline acquisition flag
-        |--------------------------------------------------------------------------
-        */
-
-        if ($ticket->assessment->is_set) {
-            $brandModel = ($brandModel ?: '—').' (Set)';
-        }
-
         // Item type — inventory first, then parent, then ticket.
         $itemType = $inventory?->item_type?->type
             ?? $parentInventory?->item_type?->type
@@ -926,6 +931,45 @@ class TicketController extends Controller
     /**
      * Return high-level ticket metrics for the dashboard.
      */
+    /**
+     * 422s when the ticket's status (or who is on it) doesn't allow the
+     * action right now -- see Ticket::workflowAllows().
+     */
+    private function ensureWorkflowAllows(Ticket $ticket, string $action): void
+    {
+        $user = Auth::user();
+        $isAdmin = $user->roles()->where('title', 'Admin')->exists();
+
+        if ($ticket->workflowAllows($action, $user->profile, $isAdmin)) {
+            return;
+        }
+
+        $status = str_replace('_', ' ', $ticket->query_status->value);
+        $isMine = $user->profile
+            && $ticket->personnel()->where('profile_id', $user->profile->id)->exists();
+        // Name the real reason: not being on the ticket, or its status.
+        $workReason = $isMine
+            ? "This can't be done while the ticket is {$status}."
+            : 'Only personnel on this ticket can do that. Accept it first.';
+
+        abort(422, match ($action) {
+            'accept' => $ticket->isFinished()
+                ? "A ticket that is {$status} can't be accepted. Reopen it first."
+                : 'You have already accepted this ticket.',
+            'unaccept' => $ticket->isFinished()
+                ? "You can't leave a ticket that is {$status}."
+                : 'You have not accepted this ticket.',
+            'await_part' => $isMine && $ticket->query_status === TicketStatus::AwaitingPart
+                ? 'This ticket is already awaiting parts.'
+                : $workReason,
+            'cancel' => $ticket->isFinished()
+                ? "A ticket that is {$status} can't be cancelled."
+                : 'Only personnel on this ticket or an Admin can cancel it.',
+            'reopen' => 'Only resolved, assessed or cancelled tickets can be reopened.',
+            default => $workReason,
+        });
+    }
+
     public function dashboardSummary()
     {
         Gate::authorize('tickets.view');

@@ -69,6 +69,12 @@ class Inventory extends Model
         return $this->belongsTo(Inventory::class, 'parent_component_id');
     }
 
+    // The reverse of parent_component: components attached to this asset.
+    public function child_components()
+    {
+        return $this->hasMany(Inventory::class, 'parent_component_id');
+    }
+
     public function item_type()
     {
         return $this->belongsTo(ItemType::class);

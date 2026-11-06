@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\TicketStatus;
 use App\Models\Ticket;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -53,24 +52,13 @@ class UpdateTicketRequest extends FormRequest
                 );
             }
 
-            $closedStatuses = [
-                TicketStatus::Resolved,
-                TicketStatus::Assessed,
-                TicketStatus::Cancelled,
-            ];
+            $itServiceId = $this->input('it_service_id');
 
-            if ($inventoryId) {
-                $hasOpenTicket = Ticket::where('inventory_id', $inventoryId)
-                    ->whereKeyNot($ticket?->id)
-                    ->whereNotIn('query_status', $closedStatuses)
-                    ->exists();
-
-                if ($hasOpenTicket) {
-                    $validator->errors()->add(
-                        'inventory',
-                        'This inventory item already has an open ticket. Please close it before assigning it to another ticket.'
-                    );
-                }
+            if ($inventoryId && $itServiceId && Ticket::hasUnfinishedFor($inventoryId, $itServiceId, $ticket?->id)) {
+                $validator->errors()->add(
+                    'inventory',
+                    'This inventory item already has an open ticket for this service type. Please close it before assigning it to another ticket.'
+                );
             }
 
             if (! $inventoryId && ! $isOtherAgency && ! $officeId) {

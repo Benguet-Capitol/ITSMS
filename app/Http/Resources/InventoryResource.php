@@ -70,6 +70,8 @@ class InventoryResource extends JsonResource
 
             'item_type' => $item_type,
             'inventory' => $parent_inventory,
+            // Only on the single-item view (InventoryController::show).
+            'child_components' => InventoryResource::collection($this->whenLoaded('child_components')),
 
             'internal_components' => InventoryInternalComponentResource::collection($this->whenLoaded('internal_components')),
             'ip_address' => $this->ip_address,

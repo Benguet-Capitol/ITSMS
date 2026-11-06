@@ -141,6 +141,39 @@ class InventoryController extends Controller
         ]);
     }
 
+    /**
+     * One inventory item, for its view page: what the list row has plus
+     * the components attached to it.
+     */
+    public function show(Request $request, Inventory $inventory, HrisClientService $hris)
+    {
+        Gate::authorize('inventories.view');
+
+        $inventory->load('child_components');
+
+        // HRIS only supplies the actual user's name; the item still loads
+        // without it, as on the ticket view.
+        $hrisUnavailable = false;
+
+        try {
+            $this->injectEmployeeMapFromInventories(
+                $request,
+                collect([$inventory])->merge($inventory->child_components),
+                $hris,
+            );
+        } catch (\Throwable $e) {
+            $hrisUnavailable = true;
+            $request->attributes->set('employeeMap', collect());
+        }
+
+        // Merged in rather than ->additional(), which would wrap the item
+        // in "data" -- same shape as TicketController::show.
+        return response()->json([
+            ...InventoryResource::make($inventory)->resolve($request),
+            'meta' => ['hris_unavailable' => $hrisUnavailable],
+        ]);
+    }
+
     public function store(StoreInventoryRequest $request)
     {
         Gate::authorize('inventories.create');
@@ -374,6 +407,7 @@ class InventoryController extends Controller
         return response()->json([
             'data' => $tickets->map(function (Ticket $ticket) {
                 return [
+                    'id' => $ticket->id,
                     'ticket_number' => $ticket->ticket_number,
                     'concern' => $ticket->concern,
                     'category' => $ticket->itService?->name,

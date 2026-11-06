@@ -51,24 +51,13 @@ class StoreTicketRequest extends FormRequest
             $inventoryId = $this->input('inventory_id');
             $isOtherAgency = (bool) $this->input('is_other_agency');
             $officeId = $this->input('office_id');
+            $itServiceId = $this->input('it_service_id');
 
-            $closedStatuses = [
-                TicketStatus::Resolved,
-                TicketStatus::Assessed,
-                TicketStatus::Cancelled,
-            ];
-
-            if ($inventoryId) {
-                $hasOpenTicket = Ticket::where('inventory_id', $inventoryId)
-                    ->whereNotIn('query_status', $closedStatuses)
-                    ->exists();
-
-                if ($hasOpenTicket) {
-                    $validator->errors()->add(
-                        'inventory',
-                        'This inventory item already has an open ticket. Please close it before creating a new one.'
-                    );
-                }
+            if ($inventoryId && $itServiceId && Ticket::hasUnfinishedFor($inventoryId, $itServiceId)) {
+                $validator->errors()->add(
+                    'inventory',
+                    'This inventory item already has an open ticket for this service type. Please close it before creating a new one.'
+                );
             }
 
             if (! $inventoryId && ! $isOtherAgency && ! $officeId) {

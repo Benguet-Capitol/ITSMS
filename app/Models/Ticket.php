@@ -70,11 +70,74 @@ class Ticket extends Model
         'reopened_at' => 'datetime',
     ];
 
+    // query_status values that mean nobody is working the ticket anymore.
+    public const FINISHED_QUERY_STATUSES = [
+        TicketStatus::Resolved,
+        TicketStatus::Assessed,
+        TicketStatus::Cancelled,
+    ];
+
+    /**
+     * One unfinished ticket per inventory item and service type: an item
+     * can have a repair ticket and a software-install ticket open at once,
+     * but not two repair tickets. $exceptId skips the ticket being edited
+     * or reopened.
+     */
+    public static function hasUnfinishedFor(int|string $inventoryId, int|string $itServiceId, int|string|null $exceptId = null): bool
+    {
+        return self::query()
+            ->setEagerLoads([])
+            ->where('inventory_id', $inventoryId)
+            ->where('it_service_id', $itServiceId)
+            ->when($exceptId, fn ($query) => $query->whereKeyNot($exceptId))
+            ->whereNotIn('query_status', self::FINISHED_QUERY_STATUSES)
+            ->exists();
+    }
+
+    public function isFinished(): bool
+    {
+        return in_array($this->query_status, self::FINISHED_QUERY_STATUSES, true);
+    }
+
+    /**
+     * Whether a lifecycle action may run on this ticket right now -- the
+     * same rules the ticket row menu uses to show its buttons, enforced
+     * here so a stale page or a direct API call can't skip them.
+     */
+    public function workflowAllows(string $action, ?Profile $profile, bool $isAdmin = false): bool
+    {
+        $isMine = $profile !== null
+            && $this->personnel()->where('profile_id', $profile->id)->exists();
+        $isActive = ! $this->isFinished();
+
+        return match ($action) {
+            'accept' => $isActive && ! $isMine,
+            'unaccept', 'check_stock', 'resolve' => $isActive && $isMine,
+            'await_part' => $isActive && $isMine && $this->query_status !== TicketStatus::AwaitingPart,
+            // Assessed tickets stay assessable so the assessment can be edited.
+            'assess' => $isMine && ($isActive || $this->query_status === TicketStatus::Assessed),
+            'cancel' => $isActive && ($isMine || $isAdmin),
+            'reopen' => ! $isActive,
+            default => false,
+        };
+    }
+
     public static function generateTicketNumber(): string
     {
         $today = Carbon::now()->format('Ymd');
-        $count = self::whereDate('created_at', Carbon::today())->count();
-        $serial = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+
+        // Next after the highest serial already used today, not today's
+        // ticket count: deleting a ticket lowers the count and would hand
+        // out a number that still exists. Compared as integers so 10000
+        // still sorts after 9999.
+        $lastSerial = self::query()
+            ->setEagerLoads([])
+            ->where('ticket_number', 'like', "{$today}-%")
+            ->pluck('ticket_number')
+            ->map(fn (string $number) => (int) substr($number, strlen($today) + 1))
+            ->max() ?? 0;
+
+        $serial = str_pad($lastSerial + 1, 4, '0', STR_PAD_LEFT);
 
         return "{$today}-{$serial}"; // 2025-0616-0001 / 20250616-0001
     }
