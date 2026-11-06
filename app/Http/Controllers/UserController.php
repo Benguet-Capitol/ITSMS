@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -72,6 +73,7 @@ class UserController extends Controller
         Gate::authorize('users.create');
 
         $data = $request->validated();
+        $this->ensureRoleAssignmentAllowed(null, (int) $data['role']);
         $data['name'] = json_decode($data['name'], true) ?? [];
         $data['img_path'] = null;
 
@@ -111,6 +113,7 @@ class UserController extends Controller
         Gate::authorize('users.update');
 
         $data = $request->validated();
+        $this->ensureRoleAssignmentAllowed($user, (int) $data['role']);
         if (isset($data['name'])) {
             $data['name'] = json_decode($data['name'], true) ?? [];
         }
@@ -182,6 +185,48 @@ class UserController extends Controller
         $user->roles()->syncWithoutDetaching([$role->id]);
 
         return response()->json(['message' => 'Role assigned to user successfully']);
+    }
+
+    /**
+     * Who may give a user which role. Anyone with users.create/update can
+     * pick a role on the user form, so without this an IT Admin Staff
+     * member (or a role made without delete rights) could make themselves
+     * Admin and get every permission back:
+     *
+     * - Nobody changes their own role.
+     * - Only an Admin assigns the Admin role, or changes an Admin's role.
+     *
+     * $target is null when creating a user. Saving a user with the role
+     * they already have is always fine, so other edits still go through.
+     */
+    private function ensureRoleAssignmentAllowed(?User $target, int $roleId): void
+    {
+        $currentRoleIds = $target
+            ? $target->roles()->pluck('roles.id')->map(fn ($id) => (int) $id)->all()
+            : [];
+
+        if ($target && $currentRoleIds === [$roleId]) {
+            return;
+        }
+
+        $actor = Auth::user();
+
+        if ($target && $target->is($actor)) {
+            abort(403, "You can't change your own role. Ask an Admin to do it.");
+        }
+
+        $adminRoleId = Role::query()->where('title', 'Admin')->value('id');
+        $adminRoleId = $adminRoleId === null ? null : (int) $adminRoleId;
+        $actorIsAdmin = $adminRoleId !== null
+            && $actor->roles()->whereKey($adminRoleId)->exists();
+
+        if ($actorIsAdmin || $adminRoleId === null) {
+            return;
+        }
+
+        if ($roleId === $adminRoleId || in_array($adminRoleId, $currentRoleIds, true)) {
+            abort(403, 'Only an Admin can assign the Admin role or change an Admin\'s role.');
+        }
     }
 
     private function syncProfileOffices(Profile $profile, ?string $officesAssignedJson = null): void
