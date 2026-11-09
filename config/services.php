@@ -42,6 +42,17 @@ return [
         'timeout' => (int) env('HRIS_TIMEOUT', 10),
     ],
 
+    // PGSO's property management system, read by `php artisan pms:sync`
+    // to counter-check inventory (docs/inventory-reconciliation.md). It
+    // returns every property in one response (~30 s), hence the timeout.
+    'pms' => [
+        'base_url' => env('PMS_BASE_URL'),
+        'api_key' => env('PMS_API_KEY'),
+        'timeout' => (int) env('PMS_TIMEOUT', 180),
+        // The PMS "office" items handed back to PGSO are listed under.
+        'returned_office' => env('PMS_RETURNED_OFFICE', 'PGSO-RETURNED'),
+    ],
+
     // Moved to config/hris.php — EmployeeController::search() reads
     // config('hris.employee_filters'), not config('services.employee_filters').
 

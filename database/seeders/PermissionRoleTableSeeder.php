@@ -125,6 +125,12 @@ class PermissionRoleTableSeeder extends Seeder
             // Activity log, ticket assign/transfer, restore -- admin roles only
             [153, 1], [154, 1], [155, 1], [156, 1],
             [153, 2], [154, 2], [155, 2], [156, 2],
+
+            // Inventory reconciliation (PMS) -- all three roles see it,
+            // admin roles act on it
+            [157, 1], [158, 1],
+            [157, 2], [158, 2],
+            [157, 3],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);

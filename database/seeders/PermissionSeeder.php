@@ -124,6 +124,8 @@ class PermissionSeeder extends Seeder
         $auditTitles = [
             153 => 'activity_logs.view', 154 => 'tickets.assign',
             155 => 'tickets.restore', 156 => 'inventories.restore',
+            // Inventory reconciliation against PGSO's property list
+            157 => 'inventory_reconciliation.view', 158 => 'inventory_reconciliation.manage',
         ];
 
         $rows = [];

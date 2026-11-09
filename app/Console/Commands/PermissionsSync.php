@@ -63,6 +63,11 @@ class PermissionsSync extends Command
         // list; Admin and It Admin Staff already had this, It Technical
         // (who also files requests) did not.
         'offices.search',
+
+        // Inventory counter-check against PGSO's property list
+        // (docs/inventory-reconciliation.md): everyone who works on
+        // inventory sees it; acting on it is admin-only (below).
+        'inventory_reconciliation.view',
     ];
 
     /** Admin-only roles (mirrors PermissionRoleTableSeeder's request workflow block). */
@@ -78,6 +83,10 @@ class PermissionsSync extends Command
         // Sprint 8 (docs/activity-log.md): the activity log page, assigning
         // and transferring tickets, restoring deleted tickets/inventory.
         'activity_logs.view', 'tickets.assign', 'tickets.restore', 'inventories.restore',
+
+        // Sprint 9 (docs/inventory-reconciliation.md): acting on the
+        // inventory counter-check.
+        'inventory_reconciliation.manage',
     ];
 
     /**

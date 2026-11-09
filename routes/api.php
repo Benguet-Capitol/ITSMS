@@ -15,6 +15,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\InspectionRequestController;
 use App\Http\Controllers\InspectorController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryReconciliationController;
 use App\Http\Controllers\InventoryReportController;
 use App\Http\Controllers\IsChangeRequestController;
 use App\Http\Controllers\ItemTypeController;
@@ -27,6 +28,7 @@ use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\OtherItServiceReportController;
 use App\Http\Controllers\OtherItServiceRequestController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\PmsOfficeMappingController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RequestWorkflowController;
@@ -179,6 +181,42 @@ Route::middleware([
         ActivityLogController::class,
         'index',
     ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inventory reconciliation (PGSO property list)
+    |--------------------------------------------------------------------------
+    |
+    | docs/inventory-reconciliation.md. Looking needs
+    | inventory_reconciliation.view; acting needs .manage, and changing an
+    | item (office, serial, number) needs inventories.update as well. PMS
+    | itself is only ever read.
+    */
+    Route::prefix('inventory-reconciliation')->group(function () {
+        Route::middleware('can:inventory_reconciliation.view')->group(function () {
+            Route::get('/', [InventoryReconciliationController::class, 'index']);
+            Route::get('sync', [InventoryReconciliationController::class, 'syncStatus']);
+            Route::get('pms-properties', [InventoryReconciliationController::class, 'pmsProperties']);
+            Route::get('office-mappings', [PmsOfficeMappingController::class, 'index']);
+            Route::get('inventories/{inventory}', [InventoryReconciliationController::class, 'show']);
+            Route::get('statuses', [InventoryReconciliationController::class, 'statuses']);
+        });
+
+        Route::middleware('can:inventory_reconciliation.manage')->group(function () {
+            Route::post('sync', [InventoryReconciliationController::class, 'sync']);
+            Route::post('dismissals', [InventoryReconciliationController::class, 'dismiss']);
+            Route::delete('dismissals/{dismissal}', [InventoryReconciliationController::class, 'undismiss']);
+            Route::put('office-mappings', [PmsOfficeMappingController::class, 'upsert']);
+            Route::delete('office-mappings/{mapping}', [PmsOfficeMappingController::class, 'destroy']);
+
+            Route::middleware('can:inventories.update')->group(function () {
+                Route::post('{inventory}/accept-office', [InventoryReconciliationController::class, 'acceptOffice']);
+                Route::post('{inventory}/accept-serial', [InventoryReconciliationController::class, 'acceptSerial']);
+                Route::post('{inventory}/link', [InventoryReconciliationController::class, 'link']);
+                Route::delete('{inventory}/link', [InventoryReconciliationController::class, 'unlink']);
+            });
+        });
+    });
     Route::apiResource('solutions', SolutionController::class);
     Route::apiResource('agencies', AgencyController::class);
     Route::get('agencies/{agency}/usage', [
