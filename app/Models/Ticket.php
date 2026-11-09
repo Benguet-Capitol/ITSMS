@@ -4,14 +4,17 @@ namespace App\Models;
 
 use App\Enums\ServiceMethod;
 use App\Enums\TicketStatus;
+use App\Models\Concerns\LogsActivity;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 class Ticket extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected static function booted(): void
     {
@@ -119,6 +122,9 @@ class Ticket extends Model
             'assess' => $isMine && ($isActive || $this->query_status === TicketStatus::Assessed),
             'cancel' => $isActive && ($isMine || $isAdmin),
             'reopen' => ! $isActive,
+            // An admin puts someone on, or moves it from one person to
+            // another, while it's still being worked.
+            'assign', 'transfer' => $isActive,
             // The client rates finished work, not a cancelled ticket. Anyone
             // allowed to resolve may record it, on the ticket or not.
             'rate' => in_array($this->query_status, [TicketStatus::Resolved, TicketStatus::Assessed], true),
@@ -133,8 +139,8 @@ class Ticket extends Model
         // Next after the highest serial already used today, not today's
         // ticket count: deleting a ticket lowers the count and would hand
         // out a number that still exists. Compared as integers so 10000
-        // still sorts after 9999.
-        $lastSerial = self::query()
+        // still sorts after 9999. Deleted tickets keep their numbers.
+        $lastSerial = self::withTrashed()
             ->setEagerLoads([])
             ->where('ticket_number', 'like', "{$today}-%")
             ->pluck('ticket_number')
@@ -181,9 +187,50 @@ class Ticket extends Model
         return $this->belongsTo(Employee::class);
     }
 
+    // A deleted item still shows on the tickets filed for it.
     public function inventory()
     {
-        return $this->belongsTo(Inventory::class);
+        return $this->belongsTo(Inventory::class)->withTrashed();
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->ticket_number;
+    }
+
+    /**
+     * The ticket with names instead of ids, who is on it, and its
+     * assessment's key fields (LogsActivity).
+     */
+    public function activitySnapshot(): array
+    {
+        $this->loadMissing(['profile', 'inventory', 'item_type', 'itService', 'solution', 'agency', 'complexityLevel']);
+        $assessment = $this->assessment()->first();
+
+        return [
+            ...self::normalizeActivityValues(Arr::only($this->getAttributes(), [
+                'ticket_number', 'client_name', 'full_name', 'contact_number', 'concern',
+                'office_code', 'office_desc', 'is_other_agency', 'query_status', 'request_status',
+                'service_method', 'date', 'accepted_at', 'resolved_at', 'assessed_at', 'reopened_at',
+                'released_at', 'released_by', 'cancellation_reason',
+                'feedback_rating', 'feedback_name', 'feedback_date', 'deleted_at',
+            ]), $this),
+            'filed_by' => $this->profile?->display_name,
+            'inventory' => $this->inventory?->property_number,
+            'item_type' => $this->item_type?->type,
+            'service_type' => $this->itService?->name,
+            'solution' => $this->solution?->title,
+            'agency' => $this->agency?->name,
+            'complexity' => $this->complexityLevel?->label,
+            'related_ticket' => $this->related_ticket_id
+                ? self::withTrashed()->setEagerLoads([])->whereKey($this->related_ticket_id)->value('ticket_number')
+                : null,
+            'personnel' => $this->personnel()->pluck('display_name')->sort()->values()->all(),
+            'assessment_control_number' => $assessment?->control_number,
+            'assessment_recommendations' => $assessment?->recommendations,
+            'assessment_replacement_available' => $assessment?->replacement_available === null ? null : (int) $assessment->replacement_available,
+            'assessment_findings' => $assessment?->component_findings,
+        ];
     }
 
     public function itService()

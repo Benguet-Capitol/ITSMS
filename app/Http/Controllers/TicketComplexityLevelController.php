@@ -73,7 +73,9 @@ class TicketComplexityLevelController extends Controller
     {
         Gate::authorize('ticket_complexity_levels.delete');
 
-        $ticketsCount = $ticketComplexityLevel->tickets()->count();
+        // Deleted tickets too: they can be restored, and the database
+        // won't let the level go while any ticket points at it.
+        $ticketsCount = $ticketComplexityLevel->tickets()->withTrashed()->count();
 
         if ($ticketsCount > 0) {
             abort(422, "Cannot delete \"{$ticketComplexityLevel->label}\": {$ticketsCount} ticket(s) are still linked to it. Reassign or delete those first.");

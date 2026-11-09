@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageUpload;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,7 @@ class UpdateUserRequest extends FormRequest
             'username' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email,'.$this->user->id],
             'status' => ['required', 'string', 'in:active,inactive'],
-            'photo_id' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,svg', 'max:2048'],
+            'photo_id' => ImageUpload::rules(),
             'role' => ['required', 'integer', 'exists:roles,id'],
             'display_name' => ['required', 'string', 'max:255'],
             'name' => ['required', 'string', 'max:255'],

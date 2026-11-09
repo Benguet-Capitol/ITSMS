@@ -6,7 +6,10 @@ use App\Enums\RequestStatus;
 use App\Models\Profile;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
@@ -20,6 +23,8 @@ use Illuminate\Validation\Rule;
  */
 trait HasRequestWorkflow
 {
+    use LogsActivity;
+
     /** Permission each workflow action needs, on top of requests.<type>.view. */
     public const WORKFLOW_PERMISSIONS = [
         'accept' => 'requests.accept',
@@ -41,6 +46,12 @@ trait HasRequestWorkflow
      */
     public static function bootHasRequestWorkflow(): void
     {
+        // Who filed it: notified on completion so they can tell the
+        // client. Set here, never from input.
+        static::creating(function (self $request) {
+            $request->filed_by_profile_id ??= Auth::user()?->profile?->id;
+        });
+
         static::saving(function (self $request) {
             if (! static::hasFeedback()) {
                 return;
@@ -78,6 +89,12 @@ trait HasRequestWorkflow
             'completed_at' => 'datetime',
             'reopened_at' => 'datetime',
         ]);
+    }
+
+    /** The staff member who filed the request. */
+    public function filedBy(): BelongsTo
+    {
+        return $this->belongsTo(Profile::class, 'filed_by_profile_id');
     }
 
     public function personnel(): MorphToMany
@@ -152,6 +169,26 @@ trait HasRequestWorkflow
     public function workflowReference(): string
     {
         return $this->control_number ?: "#{$this->getKey()}";
+    }
+
+    public function activityLabel(): string
+    {
+        return $this->workflowReference();
+    }
+
+    /** The request's own fields plus who is on it (LogsActivity). */
+    public function activitySnapshot(): array
+    {
+        return [
+            ...self::normalizeActivityValues(
+                Arr::except($this->getAttributes(), ['id', 'created_at', 'updated_at', 'office_id', 'filed_by_profile_id']),
+                $this,
+            ),
+            'filed_by' => $this->filed_by_profile_id
+                ? Profile::whereKey($this->filed_by_profile_id)->value('display_name')
+                : null,
+            'personnel' => $this->personnel()->pluck('display_name')->sort()->values()->all(),
+        ];
     }
 
     /** The person's own personnel row, if they're on this request. */

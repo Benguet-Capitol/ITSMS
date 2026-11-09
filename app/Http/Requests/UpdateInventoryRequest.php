@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\ItemType;
+use App\Rules\AvailablePropertyNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -67,7 +68,7 @@ class UpdateInventoryRequest extends FormRequest
             'microsoft_office_name' => ['nullable', 'string', 'max:255'],
             'ms_office_license_number' => ['nullable', 'string', 'max:255'],
             'other_installed_applications' => ['nullable', 'string', 'max:1000'],
-            'property_number' => ['required', 'string', 'max:255', 'unique:inventories,property_number,'.$this->route('inventory')->id],
+            'property_number' => ['required', 'string', 'max:255', new AvailablePropertyNumber($this->route('inventory')->id)],
             'date_acquired' => ['nullable', 'date'],
             'warranty_expiration_date' => ['nullable', 'date'],
             'serial_number' => ['nullable', 'string', 'max:255'],

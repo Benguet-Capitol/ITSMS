@@ -113,7 +113,10 @@ class TicketResource extends JsonResource
 
             // Duplicate clean-up: nobody on it yet (Ticket::isDeletable();
             // the resolution/assessment check runs on delete).
-            'can_delete' => $this->resource->isDeletable(checkHistory: false),
+            'can_delete' => ! $this->resource->trashed() && $this->resource->isDeletable(checkHistory: false),
+
+            // Set when the ticket is deleted (hidden, restorable).
+            'deleted_at' => $this->deleted_at,
 
             'can_unaccept' => ($this->accepted_by_me ?? false) && ! in_array($this->query_status, [
                 TicketStatus::Resolved,

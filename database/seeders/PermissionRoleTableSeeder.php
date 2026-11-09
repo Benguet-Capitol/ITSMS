@@ -121,6 +121,10 @@ class PermissionRoleTableSeeder extends Seeder
             [148, 1], [149, 1], [150, 1], [151, 1], [152, 1],
             [148, 2], [149, 2], [150, 2], [151, 2], [152, 2],
             [148, 3], [149, 3], [150, 3], [151, 3], [152, 3],
+
+            // Activity log, ticket assign/transfer, restore -- admin roles only
+            [153, 1], [154, 1], [155, 1], [156, 1],
+            [153, 2], [154, 2], [155, 2], [156, 2],
         ];
 
         $rows = array_map(fn ($p) => ['permission_id' => $p[0], 'role_id' => $p[1]], $pairs);

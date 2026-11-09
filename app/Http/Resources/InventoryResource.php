@@ -92,6 +92,8 @@ class InventoryResource extends JsonResource
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+            // Set when the item is deleted (hidden, restorable).
+            'deleted_at' => $this->deleted_at,
 
             'inventory_option_attribute' => "{$this->property_number} - {$computed_brand_model_search} ({$employee_full_name})",
         ];

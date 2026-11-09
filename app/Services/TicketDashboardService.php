@@ -120,7 +120,7 @@ class TicketDashboardService
      */
     private function overdueQuery(): Builder
     {
-        return DB::table('tickets')
+        return $this->tickets()
             ->join('ticket_complexity_levels as levels', 'levels.id', '=', 'tickets.complexity_level_id')
             ->whereIn('tickets.query_status', array_map(fn ($status) => $status->value, self::ACTIVE_STATUSES))
             ->whereNotNull('levels.max_minutes')
@@ -139,7 +139,7 @@ class TicketDashboardService
      */
     private function averages(Collection $levels): array
     {
-        $response = DB::table('tickets')
+        $response = $this->tickets()
             ->whereNotNull('accepted_at')
             ->whereColumn('accepted_at', '>=', 'created_at')
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, created_at, accepted_at)) as minutes, COUNT(*) as count')
@@ -176,7 +176,7 @@ class TicketDashboardService
 
     private function resolutionSpans(): Builder
     {
-        return DB::table('tickets')
+        return $this->tickets()
             ->whereRaw('COALESCE(reopened_at, accepted_at) IS NOT NULL')
             ->whereRaw('COALESCE(resolved_at, assessed_at) IS NOT NULL')
             ->whereRaw('COALESCE(resolved_at, assessed_at) >= COALESCE(reopened_at, accepted_at)');
@@ -184,7 +184,7 @@ class TicketDashboardService
 
     private function byComplexity(Collection $levels): array
     {
-        $counts = DB::table('tickets')
+        $counts = $this->tickets()
             ->selectRaw('complexity_level_id, COUNT(*) as count')
             ->groupBy('complexity_level_id')
             ->pluck('count', 'complexity_level_id');
@@ -208,7 +208,7 @@ class TicketDashboardService
 
     private function byServiceType(): array
     {
-        return DB::table('tickets')
+        return $this->tickets()
             ->leftJoin('it_services', 'it_services.id', '=', 'tickets.it_service_id')
             ->selectRaw("COALESCE(it_services.name, 'Not set') as label, COUNT(*) as count")
             ->groupBy('label')
@@ -226,7 +226,7 @@ class TicketDashboardService
      */
     private function byOffice(): array
     {
-        return DB::table('tickets')
+        return $this->tickets()
             ->leftJoin('agencies', 'agencies.id', '=', 'tickets.agency_id')
             ->leftJoin('inventories as items', 'items.id', '=', 'tickets.inventory_id')
             ->leftJoin('inventories as parents', 'parents.id', '=', 'items.parent_component_id')
@@ -266,6 +266,7 @@ class TicketDashboardService
         return DB::table('ticket_personnel')
             ->join('profiles', 'profiles.id', '=', 'ticket_personnel.profile_id')
             ->join('tickets', 'tickets.id', '=', 'ticket_personnel.ticket_id')
+            ->whereNull('tickets.deleted_at')
             ->selectRaw(
                 'profiles.id as profile_id, MAX(profiles.display_name) as name, MAX(profiles.engagement) as engagement, COUNT(*) as total, '
                 .'SUM(CASE WHEN tickets.query_status IN ('.$this->placeholders($active).') THEN 1 ELSE 0 END) as active, '
@@ -354,6 +355,7 @@ class TicketDashboardService
     {
         return DB::table('ticket_assessments')
             ->join('tickets', 'tickets.id', '=', 'ticket_assessments.ticket_id')
+            ->whereNull('tickets.deleted_at')
             ->leftJoin('inventories as items', 'items.id', '=', 'tickets.inventory_id')
             ->whereNull('ticket_assessments.deleted_at')
             ->select([
@@ -383,7 +385,7 @@ class TicketDashboardService
 
     private function ticketListQuery(): Builder
     {
-        return DB::table('tickets')
+        return $this->tickets()
             ->leftJoin('it_services', 'it_services.id', '=', 'tickets.it_service_id')
             ->leftJoin('ticket_complexity_levels as levels', 'levels.id', '=', 'tickets.complexity_level_id')
             ->select([
@@ -434,13 +436,13 @@ class TicketDashboardService
             default => [14, $this->now->copy()->startOfDay()->subDays(13), '%Y-%m-%d', 'addDay'],
         };
 
-        $createdByBucket = DB::table('tickets')
+        $createdByBucket = $this->tickets()
             ->where('created_at', '>=', $start)
             ->selectRaw('DATE_FORMAT(created_at, ?) as bucket, COUNT(*) as count', [$format])
             ->groupBy('bucket')
             ->pluck('count', 'bucket');
 
-        $resolvedByBucket = DB::table('tickets')
+        $resolvedByBucket = $this->tickets()
             ->whereNotNull('resolved_at')
             ->where('resolved_at', '>=', $start)
             ->selectRaw('DATE_FORMAT(resolved_at, ?) as bucket, COUNT(*) as count', [$format])
@@ -471,7 +473,7 @@ class TicketDashboardService
      */
     private function satisfaction(): array
     {
-        $counts = DB::table('tickets')
+        $counts = $this->tickets()
             ->whereNotNull('feedback_rating')
             ->selectRaw('feedback_rating, COUNT(*) as count')
             ->groupBy('feedback_rating')
@@ -501,6 +503,12 @@ class TicketDashboardService
     private function pendingDecisions(): array
     {
         return [];
+    }
+
+    /** Tickets that aren't deleted -- these raw queries skip Eloquent's soft-delete scope. */
+    private function tickets(): Builder
+    {
+        return DB::table('tickets')->whereNull('tickets.deleted_at');
     }
 
     private function placeholders(array $values): string

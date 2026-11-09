@@ -6,6 +6,7 @@ use App\Enums\RequestStatus;
 use App\Http\Resources\ProfileResource;
 use App\Models\Profile;
 use App\Notifications\RequestAssignedNotification;
+use App\Notifications\RequestCompletedNotification;
 use App\Notifications\RequestPersonnelJoinedNotification;
 use App\Services\ProfileEngagementService;
 use App\Support\RequestTypes;
@@ -161,6 +162,15 @@ class RequestWorkflowController extends Controller
             'status' => RequestStatus::Completed,
             'completed_at' => now(),
         ])->save();
+
+        // Whoever filed it tells the client (clients have no account or
+        // email here) -- unless they completed it themselves.
+        $admin = Auth::user()->profile;
+        $filer = $record->filedBy()->with('user')->first();
+
+        if ($filer?->user && $filer->id !== $admin->id) {
+            $filer->user->notify(new RequestCompletedNotification($record, $admin));
+        }
 
         return $this->respond($type, $record);
     }

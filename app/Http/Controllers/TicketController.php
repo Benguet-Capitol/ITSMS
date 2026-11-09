@@ -10,10 +10,15 @@ use App\Http\Requests\SetTicketReleaseDateRequest;
 use App\Http\Requests\SetTicketServiceMethodRequest;
 use App\Http\Requests\StoreTicketRequest;
 use App\Http\Requests\UpdateTicketRequest;
+use App\Http\Resources\ProfileResource;
 use App\Http\Resources\TicketResource;
+use App\Models\Profile;
 use App\Models\Ticket;
 use App\Models\TicketAssessment;
+use App\Notifications\TicketAssignedNotification;
+use App\Notifications\TicketCompletedNotification;
 use App\Notifications\TicketPersonnelJoinedNotification;
+use App\Services\ActivityLogger;
 use App\Services\HrisClientService;
 use App\Services\PdfImageService;
 use App\Services\ProfileEngagementService;
@@ -149,6 +154,12 @@ class TicketController extends Controller
                 case 'closed':
                     $query->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled]);
                     break;
+
+                    // Deleted tickets, for restoring; only to those who may.
+                case 'deleted':
+                    Gate::authorize('tickets.restore');
+                    $query->onlyTrashed();
+                    break;
             }
         }
 
@@ -221,6 +232,7 @@ class TicketController extends Controller
             'accepted_by_me' => (clone $baseQuery)->whereHas('personnel', fn ($q) => $q->where('profile_id', $profileId))->count(),
             'accepted_by_others' => (clone $baseQuery)->whereHas('personnel', fn ($q) => $q->where('profile_id', '!=', $profileId))->count(),
             'closed' => (clone $baseQuery)->whereIn('query_status', [TicketStatus::Resolved, TicketStatus::Cancelled])->count(),
+            'deleted' => Gate::allows('tickets.restore') ? (clone $baseQuery)->onlyTrashed()->count() : 0,
         ];
 
         return response()->json([
@@ -315,6 +327,10 @@ class TicketController extends Controller
     {
         Gate::authorize('tickets.view');
 
+        if ($ticket->trashed()) {
+            Gate::authorize('tickets.restore');
+        }
+
         // Same HRIS enrichment as index(); the ticket still loads without it.
         $hrisUnavailable = false;
 
@@ -331,7 +347,7 @@ class TicketController extends Controller
 
         $profileId = Auth::user()->profile->id;
 
-        $ticket = Ticket::query()
+        $ticket = Ticket::withTrashed()
             ->with([
                 'profile',
                 'inventory.parent_component',
@@ -452,6 +468,135 @@ class TicketController extends Controller
         return new TicketResource($ticket);
     }
 
+    /**
+     * An admin puts one or more technicians on the ticket. The first
+     * person on a queued ticket starts it, as accepting does. Each new
+     * technician is notified, except an admin assigning themselves.
+     */
+    public function assign(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.assign');
+        $this->ensureWorkflowAllows($ticket, 'assign');
+
+        $admin = Auth::user()->profile;
+        abort_unless($admin, 404, 'Profile not found.');
+
+        $data = $request->validate([
+            'profile_ids' => ['required', 'array', 'min:1'],
+            'profile_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::in($this->assignableProfiles()->pluck('id')->all()),
+            ],
+        ], [
+            'profile_ids.required' => 'Select at least one person to assign.',
+            'profile_ids.*.in' => 'Only IT personnel who can accept tickets can be assigned.',
+        ]);
+
+        $newIds = array_values(array_diff(
+            $data['profile_ids'],
+            $ticket->personnel()->pluck('profiles.id')->all(),
+        ));
+
+        if (! $newIds) {
+            abort(422, 'Everyone selected is already on this ticket.');
+        }
+
+        DB::transaction(function () use ($ticket, $admin, $newIds) {
+            $ticket->personnel()->attach(
+                array_fill_keys($newIds, ['assigned_by_profile_id' => $admin->id]),
+            );
+
+            $this->markAccepted($ticket);
+        });
+
+        $this->notifyAssigned($ticket, $admin, $newIds);
+
+        return new TicketResource($ticket->refresh());
+    }
+
+    /**
+     * Moves the ticket from one technician to another (e.g. the first is
+     * out of the office). The ticket's status and timing don't change;
+     * the new technician is notified.
+     */
+    public function transfer(Request $request, Ticket $ticket)
+    {
+        Gate::authorize('tickets.assign');
+        $this->ensureWorkflowAllows($ticket, 'transfer');
+
+        $admin = Auth::user()->profile;
+        abort_unless($admin, 404, 'Profile not found.');
+
+        $onTicket = $ticket->personnel()->pluck('profiles.id')->all();
+
+        $data = $request->validate([
+            'from_profile_id' => ['required', 'integer', Rule::in($onTicket)],
+            'to_profile_id' => [
+                'required',
+                'integer',
+                'different:from_profile_id',
+                Rule::notIn($onTicket),
+                Rule::in($this->assignableProfiles()->pluck('id')->all()),
+            ],
+        ], [
+            'from_profile_id.required' => 'Select who to transfer the ticket from.',
+            'from_profile_id.in' => 'That person is not on this ticket.',
+            'to_profile_id.required' => 'Select who to transfer the ticket to.',
+            'to_profile_id.different' => 'Pick a different person to transfer to.',
+            'to_profile_id.not_in' => 'That person is already on this ticket.',
+            'to_profile_id.in' => 'Only IT personnel who can accept tickets can be assigned.',
+        ]);
+
+        $from = Profile::findOrFail($data['from_profile_id']);
+
+        DB::transaction(function () use ($ticket, $admin, $data) {
+            $ticket->personnel()->detach($data['from_profile_id']);
+            $ticket->personnel()->attach($data['to_profile_id'], ['assigned_by_profile_id' => $admin->id]);
+        });
+
+        ProfileEngagementService::sync($from);
+
+        app(ActivityLogger::class)->addContext($ticket, [
+            'transferred_from' => $from->display_name,
+            'transferred_to' => Profile::whereKey($data['to_profile_id'])->value('display_name'),
+        ]);
+
+        $this->notifyAssigned($ticket, $admin, [$data['to_profile_id']], $from);
+
+        return new TicketResource($ticket->refresh());
+    }
+
+    /** IT personnel an admin can assign: everyone whose roles grant tickets.accept. */
+    public function personnelOptions()
+    {
+        Gate::authorize('tickets.assign');
+
+        return ProfileResource::collection(
+            $this->assignableProfiles()->orderBy('display_name')->get(),
+        );
+    }
+
+    /** Brings back a deleted ticket, with its number, history and links unchanged. */
+    public function restore(Ticket $ticket)
+    {
+        Gate::authorize('tickets.restore');
+
+        if (! $ticket->trashed()) {
+            abort(422, "Ticket {$ticket->ticket_number} isn't deleted.");
+        }
+
+        // Same rule as filing and reopening: one open ticket per item and service type.
+        if ($ticket->inventory_id && $ticket->it_service_id && ! $ticket->isFinished()
+            && Ticket::hasUnfinishedFor($ticket->inventory_id, $ticket->it_service_id, $ticket->id)) {
+            abort(422, "Ticket {$ticket->ticket_number} can't be restored: this inventory item already has an open ticket for this service type.");
+        }
+
+        $ticket->restore();
+
+        return new TicketResource($ticket->refresh());
+    }
+
     public function checkStock(Request $request, Ticket $ticket)
     {
         Gate::authorize('tickets.update');
@@ -504,6 +649,8 @@ class TicketController extends Controller
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
+
+        $this->notifyFiler($ticket);
 
         return new TicketResource($ticket);
     }
@@ -605,6 +752,9 @@ class TicketController extends Controller
             'assessed_by_position' => $user_profile_designation,
         ];
 
+        // Editing an assessment of an already assessed ticket isn't news.
+        $wasAssessed = $ticket->query_status === TicketStatus::Assessed;
+
         $existingAssessment = $ticket->assessment()->withTrashed()->first();
 
         if ($existingAssessment) {
@@ -628,6 +778,10 @@ class TicketController extends Controller
         ]);
 
         ProfileEngagementService::syncTicket($ticket);
+
+        if (! $wasAssessed) {
+            $this->notifyFiler($ticket);
+        }
 
         $ticket->load('assessment');
 
@@ -969,6 +1123,55 @@ class TicketController extends Controller
      * 422s when the ticket's status (or who is on it) doesn't allow the
      * action right now -- see Ticket::workflowAllows().
      */
+    /**
+     * Tells whoever filed the ticket that it's done, so they can let the
+     * client know (clients have no account or email here). Not when they
+     * closed it themselves.
+     */
+    private function notifyFiler(Ticket $ticket): void
+    {
+        $completedBy = Auth::user()->profile;
+        $filer = $ticket->profile_id ? Profile::with('user')->find($ticket->profile_id) : null;
+
+        if (! $completedBy || ! $filer?->user || $filer->id === $completedBy->id) {
+            return;
+        }
+
+        $filer->user->notify(new TicketCompletedNotification($ticket, $completedBy));
+    }
+
+    private function assignableProfiles()
+    {
+        return Profile::query()->whereHas(
+            'user.roles.permissions',
+            fn ($q) => $q->where('title', 'tickets.accept'),
+        );
+    }
+
+    /** The first person on a queued ticket starts it -- what accept() does. */
+    private function markAccepted(Ticket $ticket): void
+    {
+        if ($ticket->query_status === TicketStatus::Queued) {
+            $ticket->update([
+                'query_status' => TicketStatus::InProgress,
+                'request_status' => TicketStatus::Accepted,
+                'accepted_at' => now(),
+            ]);
+        }
+    }
+
+    /** @param  list<int>  $profileIds */
+    private function notifyAssigned(Ticket $ticket, Profile $admin, array $profileIds, ?Profile $transferredFrom = null): void
+    {
+        foreach (Profile::with('user')->whereIn('id', $profileIds)->get() as $assignee) {
+            ProfileEngagementService::sync($assignee);
+
+            if ($assignee->id !== $admin->id) {
+                $assignee->user?->notify(new TicketAssignedNotification($ticket, $admin, $transferredFrom));
+            }
+        }
+    }
+
     private function ensureWorkflowAllows(Ticket $ticket, string $action): void
     {
         $user = Auth::user();
@@ -1000,6 +1203,7 @@ class TicketController extends Controller
                 ? "A ticket that is {$status} can't be cancelled."
                 : 'Only personnel on this ticket or an Admin can cancel it.',
             'reopen' => 'Only resolved, assessed or cancelled tickets can be reopened.',
+            'assign', 'transfer' => "A ticket that is {$status} can't be assigned or transferred. Reopen it first.",
             'rate' => 'Only resolved or assessed tickets can be rated.',
             default => $workReason,
         });

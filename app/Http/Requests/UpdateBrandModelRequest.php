@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ImageUpload;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -28,7 +29,7 @@ class UpdateBrandModelRequest extends FormRequest
             'specification' => ['string', 'max:255', 'nullable'],
             'brand_id' => ['required', 'exists:brands,id'],
             'item_type_id' => ['required', 'exists:item_types,id'],
-            'image' => ['image', 'max:2048', 'nullable'],
+            'image' => ImageUpload::rules(),
             'year_released' => ['nullable', 'string', 'regex:/^\d{4}$/'],
             'status' => ['string'],
         ];

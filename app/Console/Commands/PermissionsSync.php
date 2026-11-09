@@ -74,7 +74,19 @@ class PermissionsSync extends Command
      */
     private const ADMIN_PERMISSIONS = [
         'requests.assign', 'requests.complete', 'requests.cancel', 'requests.reopen',
+
+        // Sprint 8 (docs/activity-log.md): the activity log page, assigning
+        // and transferring tickets, restoring deleted tickets/inventory.
+        'activity_logs.view', 'tickets.assign', 'tickets.restore', 'inventories.restore',
     ];
+
+    /**
+     * Same access as It Admin Staff minus deleting (migration
+     * 2026_11_06_100000). Optional -- not every database has it -- and
+     * given every It Admin Staff permission here except *.delete, so it
+     * keeps up as permissions are added.
+     */
+    private const NO_DELETE_ROLE = 'It Admin Staff (No Delete)';
 
     public function handle(): int
     {
@@ -87,14 +99,27 @@ class PermissionsSync extends Command
             $this->warn("Role \"{$title}\" not found -- its grants are skipped.");
         }
 
+        $noDeleteRole = Role::query()->where('title', self::NO_DELETE_ROLE)->first();
+
         $createdPermissions = 0;
         $createdGrants = 0;
 
+        // toBase(): Eloquent's only() filters by model key, not by the title keys.
+        $adminRoles = $roles->toBase()->only(self::ADMIN_ROLES);
+
         $plan = [
-            ...array_fill_keys(self::PERMISSIONS, $roles),
-            // toBase(): Eloquent's only() filters by model key, not by the title keys.
-            ...array_fill_keys(self::ADMIN_PERMISSIONS, $roles->toBase()->only(self::ADMIN_ROLES)),
+            ...array_fill_keys(self::PERMISSIONS, $roles->toBase()),
+            ...array_fill_keys(self::ADMIN_PERMISSIONS, $adminRoles),
         ];
+
+        if ($noDeleteRole && $roles->has('It Admin Staff')) {
+            foreach ($plan as $title => $planRoles) {
+                // merge(), not put(): the entries share one collection.
+                if (! str_ends_with($title, '.delete')) {
+                    $plan[$title] = $planRoles->merge([$noDeleteRole->title => $noDeleteRole]);
+                }
+            }
+        }
 
         $apply = function () use ($plan, $dryRun, &$createdPermissions, &$createdGrants) {
             foreach ($plan as $title => $roles) {

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TicketStatus;
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AgencyController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\BrandModelController;
@@ -36,6 +37,8 @@ use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketReportController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\AuthGates;
+use App\Http\Middleware\LogActivity;
+use App\Http\Middleware\LogReportGeneration;
 use App\Http\Resources\UserResource;
 use App\Services\HrisClientService;
 use App\Support\RequestTypes;
@@ -71,6 +74,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware([
     'auth:sanctum',
     AuthGates::class,
+    // Every change made through these routes goes in the activity log.
+    LogActivity::class,
 ])->group(function () {
     /*
     |--------------------------------------------------------------------------
@@ -143,13 +148,37 @@ Route::middleware([
         'usage',
     ]);
     Route::apiResource('common-problems', CommonProblemController::class);
-    Route::apiResource('inventories', InventoryController::class);
+    // A deleted item's page still opens for those who can restore it.
+    Route::apiResource('inventories', InventoryController::class)->withTrashed(['show']);
     Route::get('inventories/{inventory}/repair-history', [
         InventoryController::class,
         'repairHistory',
     ])->middleware('can:inventories.view');
+    // Deleted items are hidden, not removed; this brings one back.
+    Route::post('inventories/{inventory}/restore', [
+        InventoryController::class,
+        'restore',
+    ])->withTrashed()->middleware('can:inventories.restore');
     Route::apiResource('it-services', ItServiceController::class);
-    Route::apiResource('tickets', TicketController::class);
+    Route::apiResource('tickets', TicketController::class)->withTrashed(['show']);
+    Route::post('tickets/{ticket}/restore', [
+        TicketController::class,
+        'restore',
+    ])->withTrashed()->middleware('can:tickets.restore');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Activity log
+    |--------------------------------------------------------------------------
+    |
+    | Read-only: nothing can change or remove a log row. The whole log needs
+    | activity_logs.view; one record's history needs that record's own view
+    | permission (checked in the controller).
+    */
+    Route::get('activity-logs', [
+        ActivityLogController::class,
+        'index',
+    ]);
     Route::apiResource('solutions', SolutionController::class);
     Route::apiResource('agencies', AgencyController::class);
     Route::get('agencies/{agency}/usage', [
@@ -304,6 +333,10 @@ Route::middleware([
             RequestWorkflowController::class,
             'personnelOptions',
         ])->middleware('can:requests.assign');
+        Route::get('ticket-personnel', [
+            TicketController::class,
+            'personnelOptions',
+        ])->middleware('can:tickets.assign');
     });
 
     /*
@@ -392,6 +425,16 @@ Route::middleware([
             TicketController::class,
             'unaccept',
         ])->middleware('can:tickets.unaccept');
+        // An admin puts technicians on a ticket, or moves it from one to
+        // another; each new technician is notified.
+        Route::post('assign', [
+            TicketController::class,
+            'assign',
+        ])->middleware('can:tickets.assign');
+        Route::post('transfer', [
+            TicketController::class,
+            'transfer',
+        ])->middleware('can:tickets.assign');
 
         Route::post('check-stock', [
             TicketController::class,
@@ -443,7 +486,7 @@ Route::middleware([
         Route::get('assessment-report', [
             TicketController::class,
             'assessmentReport',
-        ])->middleware('can:tickets.print_assessment');
+        ])->middleware(['can:tickets.print_assessment', LogReportGeneration::class]);
     });
 
     /*
@@ -456,17 +499,17 @@ Route::middleware([
         Route::get('excel', [
             InventoryReportController::class,
             'exportExcel',
-        ])->middleware('can:inventories.report');
+        ])->middleware(['can:inventories.report', LogReportGeneration::class]);
 
         Route::get('pdf', [
             InventoryReportController::class,
             'exportPdf',
-        ])->middleware('can:inventories.report');
+        ])->middleware(['can:inventories.report', LogReportGeneration::class]);
 
         Route::get('word', [
             InventoryReportController::class,
             'exportWord',
-        ])->middleware('can:inventories.report');
+        ])->middleware(['can:inventories.report', LogReportGeneration::class]);
     });
 
     Route::prefix('tickets/reports')->group(function () {
@@ -478,32 +521,32 @@ Route::middleware([
         Route::get('excel', [
             TicketReportController::class,
             'exportExcel',
-        ])->middleware('can:tickets.report');
+        ])->middleware(['can:tickets.report', LogReportGeneration::class]);
 
         Route::get('pdf', [
             TicketReportController::class,
             'exportPdf',
-        ])->middleware('can:tickets.report');
+        ])->middleware(['can:tickets.report', LogReportGeneration::class]);
 
         Route::get('word', [
             TicketReportController::class,
             'exportWord',
-        ])->middleware('can:tickets.report');
+        ])->middleware(['can:tickets.report', LogReportGeneration::class]);
 
         Route::get('technician-performance/excel', [
             TicketReportController::class,
             'technicianPerformanceExcel',
-        ])->middleware('can:tickets.report');
+        ])->middleware(['can:tickets.report', LogReportGeneration::class]);
 
         Route::get('technician-performance/pdf', [
             TicketReportController::class,
             'technicianPerformancePdf',
-        ])->middleware('can:tickets.report');
+        ])->middleware(['can:tickets.report', LogReportGeneration::class]);
 
         Route::get('technician-performance/word', [
             TicketReportController::class,
             'technicianPerformanceWord',
-        ])->middleware('can:tickets.report');
+        ])->middleware(['can:tickets.report', LogReportGeneration::class]);
     });
 
     Route::prefix('other-it-service-requests/reports')->group(function () {
@@ -515,17 +558,17 @@ Route::middleware([
         Route::get('excel', [
             OtherItServiceReportController::class,
             'exportExcel',
-        ])->middleware('can:requests.other_it_services.report');
+        ])->middleware(['can:requests.other_it_services.report', LogReportGeneration::class]);
 
         Route::get('pdf', [
             OtherItServiceReportController::class,
             'exportPdf',
-        ])->middleware('can:requests.other_it_services.report');
+        ])->middleware(['can:requests.other_it_services.report', LogReportGeneration::class]);
 
         Route::get('word', [
             OtherItServiceReportController::class,
             'exportWord',
-        ])->middleware('can:requests.other_it_services.report');
+        ])->middleware(['can:requests.other_it_services.report', LogReportGeneration::class]);
     });
 
     /*
@@ -543,7 +586,7 @@ Route::middleware([
             OtherItServiceRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.other_it_services.print');
+    )->middleware(['can:requests.other_it_services.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -557,7 +600,7 @@ Route::middleware([
             CctvFootageRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.cctv_footage.print');
+    )->middleware(['can:requests.cctv_footage.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -571,7 +614,7 @@ Route::middleware([
             DocumentationRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.documentation.print');
+    )->middleware(['can:requests.documentation.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -585,7 +628,7 @@ Route::middleware([
             NetworkAssistanceRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.network_assistance.print');
+    )->middleware(['can:requests.network_assistance.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -599,7 +642,7 @@ Route::middleware([
             DesignRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.design.print');
+    )->middleware(['can:requests.design.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -613,7 +656,7 @@ Route::middleware([
             DtsUserRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.dts_user.print');
+    )->middleware(['can:requests.dts_user.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -627,7 +670,7 @@ Route::middleware([
             IsChangeRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.is_change.print');
+    )->middleware(['can:requests.is_change.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------
@@ -641,7 +684,7 @@ Route::middleware([
             InspectionRequestController::class,
             'print',
         ]
-    )->middleware('can:requests.inspection.print');
+    )->middleware(['can:requests.inspection.print', LogReportGeneration::class]);
 
     /*
     |--------------------------------------------------------------------------

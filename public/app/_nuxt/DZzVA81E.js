@@ -1,0 +1,1 @@
+import{y as e}from"#entry";function t(){return e}export{t};

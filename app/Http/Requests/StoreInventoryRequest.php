@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\ItemType;
+use App\Rules\AvailablePropertyNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -80,7 +81,7 @@ class StoreInventoryRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                'unique:inventories,property_number',
+                new AvailablePropertyNumber,
             ],
             'date_acquired' => ['nullable', 'date'],
             'warranty_expiration_date' => ['nullable', 'date'],

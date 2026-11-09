@@ -99,10 +99,16 @@ class InventoryController extends Controller
         }
 
         // ── Tab filter ───────────────────────────────────────────────────────────
+        // Deleted items, for restoring; only to those who may.
+        if ($tab === 'deleted') {
+            Gate::authorize('inventories.restore');
+        }
+
         $query = clone $baseQuery;
         match ($tab) {
             'parent_components' => $query->whereNull('parent_component_id'),
             'child_components' => $query->whereNotNull('parent_component_id'),
+            'deleted' => $query->onlyTrashed(),
             default => null,
         };
 
@@ -127,6 +133,7 @@ class InventoryController extends Controller
             'all' => (clone $baseQuery)->count(),
             'parent_components' => (clone $baseQuery)->whereNull('parent_component_id')->count(),
             'child_components' => (clone $baseQuery)->whereNotNull('parent_component_id')->count(),
+            'deleted' => Gate::allows('inventories.restore') ? (clone $baseQuery)->onlyTrashed()->count() : 0,
         ];
 
         return response()->json([
@@ -148,6 +155,10 @@ class InventoryController extends Controller
     public function show(Request $request, Inventory $inventory, HrisClientService $hris)
     {
         Gate::authorize('inventories.view');
+
+        if ($inventory->trashed()) {
+            Gate::authorize('inventories.restore');
+        }
 
         $inventory->load('child_components');
 
@@ -299,6 +310,10 @@ class InventoryController extends Controller
         );
     }
 
+    /**
+     * Hides the item (soft delete). It keeps its property number -- a new
+     * item can't take it -- and can be brought back with restore().
+     */
     public function destroy(Inventory $inventory)
     {
         Gate::authorize('inventories.delete');
@@ -306,6 +321,21 @@ class InventoryController extends Controller
         $inventory->delete();
 
         return new InventoryResource($inventory);
+    }
+
+    public function restore(Inventory $inventory)
+    {
+        Gate::authorize('inventories.restore');
+
+        if (! $inventory->trashed()) {
+            abort(422, "Inventory item {$inventory->property_number} isn't deleted.");
+        }
+
+        $inventory->restore();
+
+        return new InventoryResource(
+            $inventory->refresh()->load(['brand_model', 'item_type', 'parent_component', 'internal_components.brand_model'])
+        );
     }
 
     public function search(Request $request, HrisClientService $hris)

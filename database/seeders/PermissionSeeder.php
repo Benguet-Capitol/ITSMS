@@ -119,6 +119,13 @@ class PermissionSeeder extends Seeder
             152 => 'inspectors.select',
         ];
 
+        // Sprint 8: activity log, ticket assign/transfer, restoring deleted
+        // tickets and inventory items.
+        $auditTitles = [
+            153 => 'activity_logs.view', 154 => 'tickets.assign',
+            155 => 'tickets.restore', 156 => 'inventories.restore',
+        ];
+
         $rows = [];
         foreach ($baseTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => $base, 'updated_at' => $base];
@@ -157,6 +164,9 @@ class PermissionSeeder extends Seeder
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
         foreach ($inspectionTitles as $id => $title) {
+            $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
+        }
+        foreach ($auditTitles as $id => $title) {
             $rows[] = ['id' => $id, 'title' => $title, 'created_at' => now(), 'updated_at' => now()];
         }
 

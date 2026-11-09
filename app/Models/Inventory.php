@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 class Inventory extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected static function booted(): void
     {
@@ -64,9 +68,11 @@ class Inventory extends Model
     //   return $this->belongsTo(Employee::class, 'employee_id');
     // }
 
+    // A component still shows the asset it belonged to after that asset
+    // is deleted, and goes back under it if it's restored.
     public function parent_component()
     {
-        return $this->belongsTo(Inventory::class, 'parent_component_id');
+        return $this->belongsTo(Inventory::class, 'parent_component_id')->withTrashed();
     }
 
     // The reverse of parent_component: components attached to this asset.
@@ -133,6 +139,59 @@ class Inventory extends Model
 
         // Otherwise fallback to item_type->brand_model
         return $this->item_type?->brand_model;
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->property_number;
+    }
+
+    /**
+     * The item with names instead of ids and its internal components
+     * (LogsActivity). The actual user's name comes from the HRIS list
+     * only if it's already cached -- the log never waits on HRIS.
+     */
+    public function activitySnapshot(): array
+    {
+        $brandModel = $this->brand_model_id ? BrandModel::with('brand')->find($this->brand_model_id) : null;
+
+        return [
+            ...self::normalizeActivityValues(Arr::except($this->getAttributes(), [
+                'id', 'public_id', 'created_at', 'updated_at', 'office_id', 'division_id',
+                'item_type_id', 'brand_model_id', 'parent_component_id', 'employee_id',
+            ]), $this),
+            'actual_user' => $this->activityEmployeeName(),
+            'item_type' => $this->item_type_id ? ItemType::whereKey($this->item_type_id)->value('type') : null,
+            'brand_model' => $brandModel ? trim(($brandModel->brand?->name ?? '').' '.$brandModel->name) : null,
+            'parent_component' => $this->parent_component_id
+                ? self::withTrashed()->setEagerLoads([])->whereKey($this->parent_component_id)->value('property_number')
+                : null,
+            'internal_components' => $this->internal_components()
+                ->with('brand_model.brand')
+                ->get()
+                ->map(fn (InventoryInternalComponent $component) => collect([
+                    trim(($component->brand_model?->brand?->name ?? '').' '.($component->brand_model?->name ?? '')),
+                    'x'.($component->quantity ?? 1),
+                    $component->specific_serial_number ? "S/N {$component->specific_serial_number}" : null,
+                    $component->slot ? "slot {$component->slot}" : null,
+                    $component->notes,
+                ])->filter()->implode(' '))
+                ->sort()
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function activityEmployeeName(): ?string
+    {
+        if (! $this->employee_id) {
+            return null;
+        }
+
+        $employee = collect(Cache::get('hris:employees:all', []))
+            ->first(fn ($e) => (int) ($e['id'] ?? 0) === (int) $this->employee_id);
+
+        return $employee['fullname'] ?? "HRIS employee #{$this->employee_id}";
     }
 
     public function getResolvedOfficeNameAttribute(): ?string

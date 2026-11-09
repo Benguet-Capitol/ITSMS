@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsActivity;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, LogsActivity, Notifiable;
 
     // Without this trait, AuthenticatedSessionController::store() never
     // recognizes the user as 2FA-capable ($user instanceof
@@ -81,6 +82,34 @@ class User extends Authenticatable implements MustVerifyEmail
                 $model->id = (string) Str::uuid();
             }
         });
+    }
+
+    public function activityLabel(): string
+    {
+        return (string) $this->username;
+    }
+
+    /**
+     * The account, its role and its profile (LogsActivity). The password
+     * is compared by hash and only ever shown as "changed"; presence
+     * fields (status, last seen) aren't tracked.
+     */
+    public function activitySnapshot(): array
+    {
+        $profile = $this->profile()->with(['agencies', 'profileOffices'])->first();
+
+        return [
+            'username' => $this->username,
+            'email' => $this->email,
+            'status' => $this->status,
+            'password' => $this->password,
+            'roles' => $this->roles()->pluck('title')->sort()->values()->all(),
+            'display_name' => $profile?->display_name,
+            'designation' => $profile?->designation,
+            'gender' => $profile?->gender,
+            'offices_assigned' => $profile?->profileOffices->map(fn ($office) => $office->office_desc ?: $office->office_code)->sort()->values()->all() ?? [],
+            'agencies_assigned' => $profile?->agencies->pluck('name')->sort()->values()->all() ?? [],
+        ];
     }
 
     public function roles()

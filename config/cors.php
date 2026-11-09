@@ -19,7 +19,13 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    // The sites allowed to call the API with the session cookie,
+    // comma-separated (CORS_ALLOWED_ORIGINS). A wildcard can't be used
+    // with credentials, so each environment lists its own frontend.
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('CORS_ALLOWED_ORIGINS', 'http://itsms:8000')),
+    ))),
 
     'allowed_origins_patterns' => [],
 
