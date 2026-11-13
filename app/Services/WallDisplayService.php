@@ -33,7 +33,7 @@ class WallDisplayService
 
     public const RECENT_LIMIT = 12;
 
-    /** Roles shown on the team board, the dashboard's "Technical Staff". */
+    /** The dashboard's "Technical Staff"; everyone else on the team board is non-technical. */
     public const TECHNICAL_ROLES = ['It Technical'];
 
     /** The display's own sign-in; never shown as staff. */
@@ -146,16 +146,19 @@ class WallDisplayService
     }
 
     /**
-     * The technicians, the ones with work first, then by presence and
-     * name, each with the tickets and requests they're on.
+     * All staff, technical and not -- non-technical staff accept tickets
+     * and requests too -- the same people as the dashboard's Online Users.
+     * The ones with work first, then by presence and name, each with the
+     * tickets and requests they're on.
      *
      * @return array<int, array<string, mixed>>
      */
     private function team(): array
     {
         $users = User::query()
-            ->with('profile')
-            ->whereHas('roles', fn ($q) => $q->whereIn('title', self::TECHNICAL_ROLES))
+            ->with(['profile', 'roles:id,title'])
+            // Someone with no role can't accept work.
+            ->whereHas('roles')
             ->whereDoesntHave('roles', fn ($q) => $q->where('title', self::DISPLAY_ROLE))
             ->get()
             ->filter(fn (User $user) => $user->profile !== null);
@@ -170,6 +173,7 @@ class WallDisplayService
                 return [
                     'id' => $user->id,
                     'name' => $profile->display_name,
+                    'technical' => $user->roles->contains(fn ($role) => in_array($role->title, self::TECHNICAL_ROLES, true)),
                     'status' => $profile->status ?? Profile::STATUS_OFFLINE,
                     'last_seen_at' => $profile->last_seen_at
                         ? CarbonImmutable::parse($profile->last_seen_at)->toIso8601String()
