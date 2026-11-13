@@ -18,6 +18,15 @@
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
+    # The web app's static build lives in public/app. Its pages with an id
+    # (/app/inventories/5165, /app/tickets/12) have no file of their own, so
+    # without this they'd reach Laravel below and show its 404 when opened
+    # in a new tab or refreshed. They get the app shell, which shows the page.
+    RewriteCond %{REQUEST_URI} ^/app/
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ app/200.html [L]
+
     # Send Requests To Front Controller...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f

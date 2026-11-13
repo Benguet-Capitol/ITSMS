@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Inventory;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -89,6 +90,9 @@ class InventoryResource extends JsonResource
             'warranty_expiration_date' => $this->warranty_expiration_date,
             'serial_number' => $this->serial_number,
             'status' => $this->status,
+            'status_label' => Inventory::statusLabel($this->status),
+            'status_changed_at' => $this->status_changed_at?->toDateString(),
+            'status_note' => $this->status_note,
 
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

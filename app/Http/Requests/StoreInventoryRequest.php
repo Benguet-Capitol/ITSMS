@@ -86,7 +86,7 @@ class StoreInventoryRequest extends FormRequest
             'date_acquired' => ['nullable', 'date'],
             'warranty_expiration_date' => ['nullable', 'date'],
             'serial_number' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', 'string', 'max:255'],
+            // The status is set through POST inventories/status, not here.
 
             'internal_components' => [
                 'nullable',

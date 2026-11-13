@@ -9,10 +9,12 @@ use App\Models\Inventory;
 use App\Models\InventoryInternalComponent;
 use App\Models\Ticket;
 use App\Models\TicketResolution;
+use App\Services\ActivityLogger;
 use App\Services\HrisClientService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class InventoryController extends Controller
 {
@@ -27,6 +29,13 @@ class InventoryController extends Controller
         $officeId = $request->input('office_id');
 
         $baseQuery = Inventory::query();
+
+        // ── Status: active items unless asked otherwise ─────────────────────────
+        $status = (string) $request->input('status', Inventory::STATUS_ACTIVE);
+
+        if ($status !== 'all' && ! array_key_exists($status, Inventory::STATUSES)) {
+            abort(422, "Unknown status \"{$status}\".");
+        }
 
         // ── Search ──────────────────────────────────────────────────────────────
         if ($search !== '') {
@@ -104,11 +113,25 @@ class InventoryController extends Controller
             Gate::authorize('inventories.restore');
         }
 
-        $query = clone $baseQuery;
+        // Counted before the status filter, for the status picker.
+        $statusCounts = (clone $baseQuery)
+            ->toBase()
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->map(fn ($count) => (int) $count);
+
+        // Deleted items are listed whatever their status.
+        $deletedQuery = clone $baseQuery;
+
+        if ($status !== 'all') {
+            $baseQuery->where('status', $status);
+        }
+
+        $query = $tab === 'deleted' ? (clone $deletedQuery)->onlyTrashed() : clone $baseQuery;
         match ($tab) {
             'parent_components' => $query->whereNull('parent_component_id'),
             'child_components' => $query->whereNotNull('parent_component_id'),
-            'deleted' => $query->onlyTrashed(),
             default => null,
         };
 
@@ -133,8 +156,10 @@ class InventoryController extends Controller
             'all' => (clone $baseQuery)->count(),
             'parent_components' => (clone $baseQuery)->whereNull('parent_component_id')->count(),
             'child_components' => (clone $baseQuery)->whereNotNull('parent_component_id')->count(),
-            'deleted' => Gate::allows('inventories.restore') ? (clone $baseQuery)->onlyTrashed()->count() : 0,
+            'deleted' => Gate::allows('inventories.restore') ? (clone $deletedQuery)->onlyTrashed()->count() : 0,
         ];
+
+        $statusCounts = collect(Inventory::STATUSES)->map(fn ($label, $key) => $statusCounts[$key] ?? 0);
 
         return response()->json([
             'data' => InventoryResource::collection($inventories),
@@ -144,6 +169,9 @@ class InventoryController extends Controller
                 'current_page' => $inventories->currentPage(),
                 'last_page' => $inventories->lastPage(),
                 'counts' => $counts,
+                'status' => $status,
+                // Live items of each status, with the other filters applied.
+                'status_counts' => $statusCounts,
             ],
         ]);
     }
@@ -229,6 +257,8 @@ class InventoryController extends Controller
     public function update(UpdateInventoryRequest $request, Inventory $inventory)
     {
         Gate::authorize('inventories.update');
+
+        abort_if($inventory->isReadOnly(), 422, self::readOnlyMessage($inventory));
 
         $data = $request->validated();
         $itemType = $request->resolvedItemType();
@@ -318,9 +348,77 @@ class InventoryController extends Controller
     {
         Gate::authorize('inventories.delete');
 
+        abort_if($inventory->isReadOnly(), 422, self::readOnlyMessage($inventory));
+
         $inventory->delete();
 
         return new InventoryResource($inventory);
+    }
+
+    /**
+     * Sets the lifecycle status of one or more items (docs/inventory-
+     * status.md): returned to PGSO, disposed, donated, or active again.
+     * With include_components, the components attached to them follow.
+     */
+    public function changeStatus(Request $request, ActivityLogger $logger)
+    {
+        Gate::authorize('inventories.update');
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer', 'distinct'],
+            'status' => ['required', Rule::in(array_keys(Inventory::STATUSES))],
+            'date' => ['nullable', 'date', 'before_or_equal:today'],
+            'note' => ['nullable', 'string', 'max:500'],
+            'include_components' => ['nullable', 'boolean'],
+        ]);
+
+        $items = Inventory::query()->setEagerLoads([])->whereIn('id', $data['ids'])->get();
+
+        abort_if(
+            $items->count() !== count($data['ids']),
+            422,
+            "Some of these items don't exist or were deleted. Refresh and try again.",
+        );
+
+        if ($data['include_components'] ?? false) {
+            $items = $items->concat(
+                Inventory::query()->setEagerLoads([])
+                    ->whereIn('parent_component_id', $items->pluck('id'))
+                    ->whereNotIn('id', $items->pluck('id'))
+                    ->get()
+            );
+        }
+
+        $changes = [
+            'status' => $data['status'],
+            'status_changed_at' => $data['date'] ?? now()->toDateString(),
+            'status_note' => $data['note'] ?? null,
+        ];
+
+        DB::transaction(function () use ($items, $changes, $logger) {
+            foreach ($items as $item) {
+                // Not route-bound, so the log has to be told before the change.
+                $logger->watch($item);
+                $item->update($changes);
+            }
+        });
+
+        $label = Inventory::statusLabel($data['status']);
+        $count = $items->count();
+
+        return response()->json([
+            'message' => $count === 1
+                ? "{$items->first()->property_number} is now {$label}."
+                : "{$count} items are now {$label}.",
+            'data' => ['ids' => $items->pluck('id')->values(), 'status' => $data['status']],
+        ]);
+    }
+
+    private static function readOnlyMessage(Inventory $inventory): string
+    {
+        return "{$inventory->property_number} is ".strtolower(Inventory::statusLabel($inventory->status))
+            .' and kept for the record. Set it back to Active first to change it.';
     }
 
     public function restore(Inventory $inventory)
@@ -347,7 +445,9 @@ class InventoryController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $limit;
 
+        // Picking an item for a ticket: only items in service.
         $inventories = Inventory::query()
+            ->active()
             ->when($query !== '', function ($qBuilder) use ($query, $hris) {
                 $employeeIds = collect($hris->searchEmployees($query))
                     ->filter(fn ($employee) => isset($employee['id']))
@@ -400,6 +500,7 @@ class InventoryController extends Controller
         $exclude_id = $request->input('exclude_id');
 
         $inventories = Inventory::query()
+            ->active()
             ->whereNull('parent_component_id')
             ->when($query, function ($qBuilder) use ($query) {
                 $qBuilder->where('property_number', 'like', "%{$query}%");

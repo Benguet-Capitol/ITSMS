@@ -173,6 +173,11 @@ Route::middleware([
         InventoryController::class,
         'restore',
     ])->withTrashed()->middleware('can:inventories.restore');
+    // Returned to PGSO, disposed, donated or active again; one item or many.
+    Route::post('inventories/status', [
+        InventoryController::class,
+        'changeStatus',
+    ])->middleware('can:inventories.update');
     Route::apiResource('it-services', ItServiceController::class);
     Route::apiResource('tickets', TicketController::class)->withTrashed(['show']);
     Route::post('tickets/{ticket}/restore', [
@@ -222,6 +227,8 @@ Route::middleware([
             Route::delete('office-mappings/{mapping}', [PmsOfficeMappingController::class, 'destroy']);
 
             Route::middleware('can:inventories.update')->group(function () {
+                Route::post('mark-returned', [InventoryReconciliationController::class, 'markReturned']);
+                Route::post('{inventory}/reactivate', [InventoryReconciliationController::class, 'reactivate']);
                 Route::post('{inventory}/accept-office', [InventoryReconciliationController::class, 'acceptOffice']);
                 Route::post('{inventory}/accept-serial', [InventoryReconciliationController::class, 'acceptSerial']);
                 Route::post('{inventory}/link', [InventoryReconciliationController::class, 'link']);

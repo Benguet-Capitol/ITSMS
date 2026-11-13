@@ -48,7 +48,7 @@ class InventoryReportController extends Controller
                     ?: data_get($employee, 'full_name')
                     ?: 'All',
                 'office' => $officeDesc ?: 'All',
-                'status' => $this->cleanPdfText($request->input('status')) ?: 'All',
+                'status' => $request->filled('status') ? Inventory::statusLabel($request->input('status')) : 'All',
             ];
 
             $generatedAt = now()->format('F d, Y h:i A');
@@ -197,7 +197,7 @@ class InventoryReportController extends Controller
                     ?: 'All',
                 'office' => $officeDesc ?: 'All',
                 'division' => $this->cleanPdfText($request->input('division_name')) ?: 'All',
-                'status' => $this->cleanPdfText($request->input('status')) ?: 'All',
+                'status' => $request->filled('status') ? Inventory::statusLabel($request->input('status')) : 'All',
             ];
 
             $summary = collect($rows)
@@ -433,7 +433,7 @@ class InventoryReportController extends Controller
                     'brand_model' => $this->cleanPdfText($brandModelDisplay),
                     'child_components' => $this->cleanPdfText($childComponentsDisplay),
                     'serial_number' => $this->cleanPdfText($inventory->serial_number),
-                    'status' => $this->cleanPdfText($inventory->status),
+                    'status' => Inventory::statusLabel($inventory->status),
                     'date_acquired' => $this->cleanPdfText(
                         $rawDateAcquired
                             ? Carbon::parse($rawDateAcquired)->format('F d, Y')

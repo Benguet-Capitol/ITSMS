@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Inventory;
 use App\Models\PmsInventoryLink;
 use App\Models\PmsOfficeMapping;
 use App\Models\PmsProperty;
@@ -20,8 +21,12 @@ use Illuminate\Support\Facades\DB;
  */
 class PmsReconciliation
 {
-    /** Shown in this order. */
-    public const ISSUES = ['returned', 'office', 'serial', 'parent', 'not_in_pms', 'pms_only'];
+    /**
+     * Shown in this order. "returned": active in ITSMS, returned in PMS.
+     * "reissued": returned, disposed or donated in ITSMS, but PMS has it at
+     * an office again (docs/inventory-status.md).
+     */
+    public const ISSUES = ['returned', 'reissued', 'office', 'serial', 'parent', 'not_in_pms', 'pms_only'];
 
     /** @var Collection<int, object> live inventory by id */
     private Collection $inventory;
@@ -68,23 +73,32 @@ class PmsReconciliation
             }
 
             $property = $this->pms[$pmsId];
+            $inService = ($item->status ?? Inventory::STATUS_ACTIVE) === Inventory::STATUS_ACTIVE;
+            $pmsReturned = strtoupper((string) $property->office_code) === $returnedOffice;
+            $mapping = $property->office_code !== null ? $mappings->get(strtoupper($property->office_code)) : null;
+            $mappingSummary = $mapping ? [
+                'office_id' => $mapping->office_id,
+                'office_code' => $mapping->office_code,
+                'office_name' => $mapping->office_name,
+            ] : null;
 
-            if (strtoupper((string) $property->office_code) === $returnedOffice) {
+            if ($inService && $pmsReturned) {
                 $items->push($this->item('returned', $item, $property, [$property->office_code]));
-            } elseif ($item->parent_component_id === null && $property->office_code !== null) {
+            } elseif (! $inService && ! $pmsReturned && $property->office_code !== null) {
+                // PMS keeps returned, disposed and donated items under the
+                // returned office, so an office means PGSO issued it again.
+                $items->push($this->item('reissued', $item, $property, [$item->status, $property->office_code, $mapping?->office_id], [
+                    'office_mapping' => $mappingSummary,
+                ]));
+            } elseif ($inService && $item->parent_component_id === null && $property->office_code !== null) {
                 // Components take their office from the asset they're in, so only stand-alone items are compared.
-                $mapping = $mappings->get(strtoupper($property->office_code));
                 $sameOffice = $mapping
                     ? (int) $item->office_id === $mapping->office_id
                     : in_array(strtoupper($property->office_code), [strtoupper((string) $item->office_code), strtoupper((string) $item->office_name)], true);
 
                 if (! $sameOffice) {
                     $items->push($this->item('office', $item, $property, [$item->office_id, $item->office_code, $property->office_code, $mapping?->office_id], [
-                        'office_mapping' => $mapping ? [
-                            'office_id' => $mapping->office_id,
-                            'office_code' => $mapping->office_code,
-                            'office_name' => $mapping->office_name,
-                        ] : null,
+                        'office_mapping' => $mappingSummary,
                     ]));
                 }
             }
@@ -94,8 +108,9 @@ class PmsReconciliation
                 $items->push($this->item('serial', $item, $property, [$item->serial_number, $property->property_details]));
             }
 
-            // Only when PMS puts it under an asset that ITSMS also has.
-            $expectedParent = $property->main_id ? ($this->pmsToInventory[$property->main_id] ?? null) : null;
+            // Only when PMS puts it under an asset that ITSMS also has, and
+            // only for items in service.
+            $expectedParent = $inService && $property->main_id ? ($this->pmsToInventory[$property->main_id] ?? null) : null;
 
             if ($expectedParent !== null && (int) $item->parent_component_id !== $expectedParent) {
                 $items->push($this->item('parent', $item, $property, [$item->parent_component_id, $property->main_id], [
@@ -304,7 +319,7 @@ class PmsReconciliation
             ->whereNull('i.deleted_at')
             ->get([
                 'i.id', 'i.property_number', 'i.serial_number', 'i.office_id', 'i.office_code',
-                'i.office_name', 'i.parent_component_id', 't.type as item_type',
+                'i.office_name', 'i.parent_component_id', 'i.status', 't.type as item_type',
             ])
             ->keyBy('id');
 
@@ -370,6 +385,8 @@ class PmsReconciliation
             'office_code' => $item->office_code ?? $parent?->office_code,
             'office_name' => $item->office_name ?? $parent?->office_name,
             'serial_number' => $item->serial_number,
+            'status' => $item->status ?? Inventory::STATUS_ACTIVE,
+            'status_label' => Inventory::statusLabel($item->status),
             'parent_component_id' => $item->parent_component_id !== null ? (int) $item->parent_component_id : null,
             'parent_property_number' => $parent?->property_number,
             'linked' => isset($this->linked[$item->id]),

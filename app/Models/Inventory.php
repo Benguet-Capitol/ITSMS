@@ -14,6 +14,45 @@ class Inventory extends Model
 {
     use HasFactory, LogsActivity, SoftDeletes;
 
+    /*
+     * The item's lifecycle (docs/inventory-status.md). Only active items
+     * are in service; the others stay on record. A re-issued item is
+     * active again, at its new office.
+     */
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_RETURNED = 'returned';
+
+    public const STATUS_DISPOSED = 'disposed';
+
+    public const STATUS_DONATED = 'donated';
+
+    public const STATUSES = [
+        self::STATUS_ACTIVE => 'Active',
+        self::STATUS_RETURNED => 'Returned to PGSO',
+        self::STATUS_DISPOSED => 'Disposed',
+        self::STATUS_DONATED => 'Donated',
+    ];
+
+    /** Kept for the record only: no edits until set back to active. */
+    public const READ_ONLY_STATUSES = [self::STATUS_DISPOSED, self::STATUS_DONATED];
+
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUSES[$status ?? self::STATUS_ACTIVE] ?? (string) $status;
+    }
+
+    /** Items in service: the default everywhere items are listed or picked. */
+    public function scopeActive($query)
+    {
+        return $query->where($query->qualifyColumn('status'), self::STATUS_ACTIVE);
+    }
+
+    public function isReadOnly(): bool
+    {
+        return in_array($this->status, self::READ_ONLY_STATUSES, true);
+    }
+
     protected static function booted(): void
     {
         // public_id is the safe, non-guessable identifier external
@@ -30,6 +69,11 @@ class Inventory extends Model
     protected $casts = [
         'employee_id' => 'integer',
         'office_id' => 'integer',
+        'status_changed_at' => 'date:Y-m-d',
+    ];
+
+    protected $attributes = [
+        'status' => self::STATUS_ACTIVE,
     ];
 
     protected $fillable = [
@@ -56,7 +100,10 @@ class Inventory extends Model
         'date_acquired',
         'warranty_expiration_date',
         'serial_number',
+        // Set through InventoryStatusController, not the edit form.
         'status',
+        'status_changed_at',
+        'status_note',
     ];
 
     public function brand_model()

@@ -15,6 +15,7 @@ use App\Services\PmsReconciliation;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -191,6 +192,92 @@ class InventoryReconciliationController extends Controller
         $logger->addContext($inventory, ['source' => 'PMS', 'pms_property_no' => $item['pms']['property_no']]);
 
         return response()->json(['message' => "{$inventory->property_number}'s serial number is now {$item['pms']['serial_number']}."]);
+    }
+
+    /**
+     * Marks items PMS lists as returned to PGSO as returned in ITSMS too,
+     * keeping them on record (docs/inventory-status.md). Either the given
+     * items or, with `all`, every open item on the Returned to PGSO list.
+     * Only items still on that list are changed.
+     */
+    public function markReturned(Request $request, PmsReconciliation $reconciliation, ActivityLogger $logger)
+    {
+        $data = $request->validate([
+            'all' => ['nullable', 'boolean'],
+            'inventory_ids' => ['required_without:all', 'array', 'max:500'],
+            'inventory_ids.*' => ['integer', 'distinct'],
+        ]);
+
+        $onList = $reconciliation->issues()
+            ->where('issue', 'returned')
+            ->whereNull('dismissal');
+
+        $wanted = ($data['all'] ?? false)
+            ? $onList
+            : $onList->filter(fn (array $item) => in_array($item['inventory']['id'], $data['inventory_ids'] ?? [], true));
+
+        abort_if($wanted->isEmpty(), 422, 'None of these are on the Returned to PGSO list any more. Refresh the list.');
+
+        $items = Inventory::query()->setEagerLoads([])
+            ->whereIn('id', $wanted->pluck('inventory.id'))
+            ->get()
+            ->keyBy('id');
+
+        DB::transaction(function () use ($items, $wanted, $logger) {
+            foreach ($wanted as $issue) {
+                $inventory = $items[$issue['inventory']['id']];
+
+                // Not route-bound, so the log has to be told before the change.
+                $logger->watch($inventory);
+                $inventory->update([
+                    'status' => Inventory::STATUS_RETURNED,
+                    'status_changed_at' => now()->toDateString(),
+                    'status_note' => null,
+                ]);
+
+                $logger->addContext($inventory, ['source' => 'PMS', 'pms_property_no' => $issue['pms']['property_no'], 'pms_office' => $issue['pms']['office_code']]);
+            }
+        });
+
+        $count = $items->count();
+
+        return response()->json([
+            'message' => $count === 1
+                ? "{$items->first()->property_number} is now returned to PGSO."
+                : "{$count} items are now returned to PGSO.",
+            'data' => ['count' => $count],
+        ]);
+    }
+
+    /**
+     * An item PGSO issued again: active, at the HRIS office its PMS office
+     * is mapped to.
+     */
+    public function reactivate(Inventory $inventory, PmsReconciliation $reconciliation, ActivityLogger $logger)
+    {
+        $item = $reconciliation->issueFor('reissued', $inventory->id);
+
+        abort_unless($item, 422, "PMS doesn't list {$inventory->property_number} at an office, or it's already active.");
+
+        $mapping = $item['office_mapping'];
+
+        abort_unless($mapping, 422, "PMS office \"{$item['pms']['office_code']}\" isn't mapped to an HRIS office yet. Map it first, under Office mapping.");
+
+        $officeChanged = (int) $inventory->office_id !== $mapping['office_id'];
+
+        $inventory->update([
+            'status' => Inventory::STATUS_ACTIVE,
+            'status_changed_at' => now()->toDateString(),
+            'status_note' => null,
+            'office_id' => $mapping['office_id'],
+            'office_code' => $mapping['office_code'],
+            'office_name' => $mapping['office_name'],
+            ...($officeChanged ? ['division_id' => null, 'division_name' => null] : []),
+        ]);
+
+        $logger->addContext($inventory, ['source' => 'PMS', 'pms_property_no' => $item['pms']['property_no'], 'pms_office' => $item['pms']['office_code']]);
+
+        return response()->json(['message' => "{$inventory->property_number} is active again, at {$mapping['office_code']}."]);
     }
 
     /**
