@@ -285,9 +285,6 @@ class TicketReportController extends Controller
         }
     }
 
-    /**
-	 *
-     */
     private function getReportRows(Request $request)
     {
         $query = Ticket::query()

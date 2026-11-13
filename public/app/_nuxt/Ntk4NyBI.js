@@ -1,0 +1,1 @@
+import{N as e}from"./D0BynVNn.js";import{t}from"./DHxPVkGi.js";var n=()=>{let n=t(),{apiUrl:r}=e();return{fetchWallDisplayApi:async()=>await n(r(`display`).toString())}};export{n as t};

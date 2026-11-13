@@ -15,3 +15,7 @@ Schedule::command('users:mark-offline')->everyFiveMinutes()->withoutOverlapping(
 // Copy of PGSO's property list for the inventory counter-check; does
 // nothing until PMS_BASE_URL is set.
 Schedule::command('pms:sync')->dailyAt('02:00')->withoutOverlapping();
+
+// Unaccepted and stalled tickets/requests, weekdays at 8:00 AM in the
+// app's timezone (APP_TIMEZONE).
+Schedule::command('reminders:send')->weekdays()->at('08:00')->withoutOverlapping();

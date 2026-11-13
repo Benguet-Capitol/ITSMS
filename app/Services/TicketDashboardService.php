@@ -48,9 +48,12 @@ class TicketDashboardService
 
     private CarbonInterface $now;
 
+    private CarbonInterface $acceptCutoff;
+
     public function __construct()
     {
         $this->now = Carbon::now();
+        $this->acceptCutoff = (new WorkReminders($this->now))->acceptCutoff();
     }
 
     public function summary(string $trendPeriod = 'daily'): array
@@ -70,7 +73,10 @@ class TicketDashboardService
                     ? Ticket::query()->where('complexity_level_id', $complexLevel->id)->count()
                     : 0,
                 'complex_label' => $complexLevel?->label,
-                'overdue' => $this->overdueQuery()->count(),
+                // Accepted tickets past their level's maximum, plus queued
+                // ones nobody accepted within a working day.
+                'overdue' => $this->overdueQuery()->count() + $this->unacceptedQuery()->count(),
+                'overdue_unaccepted' => $this->unacceptedQuery()->count(),
                 'closed' => Ticket::query()
                     ->where('request_status', TicketStatus::Closed->value)
                     ->count(),
@@ -96,7 +102,9 @@ class TicketDashboardService
             'overdue_rule' => 'An accepted, unfinished ticket whose current work session '
                 .'(since acceptance, or since its last reopen) has run longer than its '
                 ."complexity level's maximum minutes. Levels without a maximum, and tickets "
-                .'without a complexity level, are never overdue.',
+                .'without a complexity level, are never overdue. A queued ticket nobody has '
+                .'accepted within '.WorkReminders::ACCEPT_WITHIN_WORKING_DAYS.' working day (Monday to Friday) '
+                .'is overdue too.',
             'pending_decisions' => $this->pendingDecisions(),
         ];
     }
@@ -129,6 +137,14 @@ class TicketDashboardService
                 'TIMESTAMPDIFF(MINUTE, COALESCE(tickets.reopened_at, tickets.accepted_at), ?) > levels.max_minutes',
                 [$this->now->toDateTimeString()],
             );
+    }
+
+    /** Queued tickets nobody accepted within the working-day limit. */
+    private function unacceptedQuery(): Builder
+    {
+        return $this->tickets()
+            ->whereIn('query_status', array_map(fn ($status) => $status->value, self::PENDING_STATUSES))
+            ->where('created_at', '<', $this->acceptCutoff->toDateTimeString());
     }
 
     /**
@@ -340,7 +356,8 @@ class TicketDashboardService
                 ->get()
                 ->map(fn ($row) => [
                     ...$this->ticketListRow($row),
-                    'reason' => 'pending',
+                    // Past the time to accept it: shown as overdue.
+                    'reason' => Carbon::parse($row->created_at) < $this->acceptCutoff ? 'unaccepted' : 'pending',
                     'elapsed_minutes' => (int) Carbon::parse($row->created_at)->diffInMinutes($this->now),
                     'limit_minutes' => null,
                 ]);

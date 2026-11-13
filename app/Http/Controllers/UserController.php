@@ -10,6 +10,7 @@ use App\Models\ProfileOffice;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\ProfileEngagementService;
+use App\Services\WallDisplayService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -296,6 +297,8 @@ class UserController extends Controller
             'roles',
             'profile.departments',
         ])
+            // The wall display's sign-in isn't a member of staff.
+            ->whereDoesntHave('roles', fn ($q) => $q->where('title', WallDisplayService::DISPLAY_ROLE))
             ->get();
 
         // What the busy people are on (tickets and requests), in one batch.

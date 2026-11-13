@@ -38,6 +38,7 @@ use App\Http\Controllers\TicketComplexityLevelController;
 use App\Http\Controllers\TicketController;
 use App\Http\Controllers\TicketReportController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WallDisplayController;
 use App\Http\Middleware\AuthGates;
 use App\Http\Middleware\LogActivity;
 use App\Http\Middleware\LogReportGeneration;
@@ -110,6 +111,17 @@ Route::middleware([
         TicketController::class,
         'dashboardSummary',
     ])->middleware('can:tickets.view');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Wall display (the IT office TV)
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('display', [
+        WallDisplayController::class,
+        'show',
+    ])->middleware('can:display.view');
 
     /*
     |--------------------------------------------------------------------------

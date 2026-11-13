@@ -2,7 +2,6 @@
 
 namespace App\Observers;
 
-use App\Models\Profile;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notifications\TicketCreatedNotification;

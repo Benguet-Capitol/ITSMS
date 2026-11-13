@@ -1,0 +1,1 @@
+import{t as e}from"./CWO67DqH.js";var t=()=>{let{user:t}=e();return{hasRole:e=>t.value?.roles?.some(t=>t.title.toLowerCase()===e.toLowerCase())}};export{t};

@@ -1,0 +1,1 @@
+import{g as e}from"./Car86Ubo.js";import{N as t}from"./D0BynVNn.js";import{t as n}from"./DHxPVkGi.js";var r=()=>{let r=n(),{apiUrl:i}=t(),a=e(()=>i(`activity-logs`));return{fetchActivityLogsApi:async e=>await r(`${a.value}?${e.toString()}`)}};export{r as t};

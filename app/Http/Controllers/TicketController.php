@@ -23,6 +23,7 @@ use App\Services\HrisClientService;
 use App\Services\PdfImageService;
 use App\Services\ProfileEngagementService;
 use App\Services\TicketDashboardService;
+use App\Services\WorkReminders;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -1256,6 +1257,22 @@ class TicketController extends Controller
                 ->pluck('count', 'query_status'),
 
             ...$dashboard->summary($validated['trend'] ?? 'daily'),
+
+            // The signed-in person's own accepted, unfinished tickets and
+            // requests, the ones needing attention first.
+            'my_work' => $this->myWork($request->user()?->profile),
         ]);
+    }
+
+    private function myWork(?Profile $profile): array
+    {
+        $items = $profile ? (new WorkReminders)->openFor($profile) : collect();
+
+        return [
+            'open' => $items->count(),
+            'overdue' => $items->where('reason', 'overdue')->count(),
+            'no_update' => $items->where('reason', 'no_update')->count(),
+            'items' => $items->take(8)->values()->all(),
+        ];
     }
 }

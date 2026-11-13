@@ -8,12 +8,11 @@ use PhpOffice\PhpWord\PhpWord;
 class WordReportService
 {
     /**
-     *
      * @param  array<int, array{heading?: string, headings?: array<int, string>, rows?: array<int, array<int, mixed>>}>  $sections
      */
     public function build(string $title, array $sections, ?string $subtitle = null): string
     {
-        $phpWord = new PhpWord();
+        $phpWord = new PhpWord;
 
         $docSection = $phpWord->addSection([
             'orientation' => 'landscape',
