@@ -173,6 +173,8 @@ class WallDisplayService
                 return [
                     'id' => $user->id,
                     'name' => $profile->display_name,
+                    // The profile photo, as the dashboard's Online Users shows it.
+                    'avatar_url' => $profile->img_path ? asset("storage/{$profile->img_path}") : null,
                     'technical' => $user->roles->contains(fn ($role) => in_array($role->title, self::TECHNICAL_ROLES, true)),
                     'status' => $profile->status ?? Profile::STATUS_OFFLINE,
                     'last_seen_at' => $profile->last_seen_at
